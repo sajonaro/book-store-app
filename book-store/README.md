@@ -1,71 +1,159 @@
-# Book Store Project using MERN Stack
+# Book Store — MERN App
 
-This is a full-stack web application for a book store built using the MERN stack (MongoDB, Express.js, React.js, Node.js). Users can browse through a collection of books, search for specific titles, view details of each book, add them to their cart for purchase, create new books, edit existing books, and delete books.
+A full-stack book management application built with **MongoDB, Express, React, and Node.js**, containerised with **Docker** and running with **Bun**.
 
-## Features
-1. **Show Books:** Browse through a collection of books using cards and tables.
-2. **Create New Books:** Add new books to the collection.
-3. **Edit Existing Books:** Modify details of existing books.
-4. **Delete Books:** Remove books from the collection.
-5. **Show Description:** View detailed description of each book.
+---
 
-## Installation
-1. Clone the repository to your local machine:
-    ```
-    git clone https://github.com/yourusername/book-store.git
-    ```
+## Architecture
 
-2. Navigate to the project directory:
-    ```
-    cd book-store
-    ```
+```
+Browser
+  └── frontend  (nginx, port 8080)
+        ├── /           → React SPA (static files)
+        └── /books/*    → proxied to backend (internal)
+              └── backend  (Bun + Express, port 5555, internal)
+                    └── mongo  (MongoDB 7, port 27017, internal)
+```
 
-3. Install dependencies for both frontend and backend:
-    ```
-    npm install
-    cd ./frontend
-    npm install
-    ```
+- **Frontend** — React 18 + Vite + Tailwind CSS, served by nginx
+- **Backend** — Express on Bun runtime (hardened with helmet, rate-limiting, mongo-sanitize)
+- **Database** — MongoDB 7 with authenticated access, data persisted in a named Docker volume
 
-4. Create a `.env` file in the root directory of the project:
+---
 
-    ```
-    PORT=3000
-    mongoDBURL=your_mongodb_url
-    ```
+## Running with Docker Compose (recommended)
 
-    Replace `your_mongodb_url` with the URL of your MongoDB database.
+### Prerequisites
 
-5. Change the axios url in `frontend/src/pages`
-    
-    ```https://book-store-b8k4.onrender.com``` replace this with ```http://localhost:3000``` in all files in ```frontend/src/pages ```
+- [Docker](https://docs.docker.com/get-docker/) ≥ 24
+- [Docker Compose](https://docs.docker.com/compose/) v2 (ships with Docker Desktop)
 
+### Steps
 
-5. Start the server:
-    ```
-    npm run dev
-    ```
+```bash
+# 1. Clone / enter the repo
+cd book-store
 
-6. Start the client:
-    ```
-    cd frontend
-    npm run dev
-    ```
+# 2. Create your environment file from the template
+cp .env.example .env
 
-7. Open your browser and navigate to `http://localhost:5173` to view the application.
+# 3. Open .env and set a strong MongoDB password
+#    MONGO_ROOT_PASSWORD=<your-strong-password>
 
-## Usage
-- As a user, you can browse through the collection of books using cards and tables, view detailed descriptions of each book, and add them to your cart for purchase.
-- If you are an admin, you can access the admin panel by logging in with your credentials. From there, you can manage books by creating new ones, editing existing ones, or deleting books.
+# 4. Build images and start all services
+docker compose up --build
 
-## Technologies Used
-- MongoDB
-- Express.js
-- React.js
-- Node.js
+# The app is now available at http://localhost:8080
+```
 
-## Contributors
-- [atharvkhardekar](https://github.com/atharvkhardekar)
+To run in the background:
 
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+docker compose up --build -d
+```
+
+To stop and remove containers (data volume is preserved):
+
+```bash
+docker compose down
+```
+
+To also remove the database volume (⚠ deletes all data):
+
+```bash
+docker compose down -v
+```
+
+### Environment variables (`.env`)
+
+| Variable | Default | Required | Description |
+|---|---|---|---|
+| `MONGO_ROOT_USER` | `admin` | No | MongoDB root username |
+| `MONGO_ROOT_PASSWORD` | — | **Yes** | MongoDB root password |
+| `MONGO_DB` | `bookstore` | No | Database name |
+| `FRONTEND_PORT` | `8080` | No | Host port for the web UI |
+
+---
+
+## Running locally (without Docker)
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) ≥ 20  **or** [Bun](https://bun.sh/) ≥ 1.0
+- A running MongoDB instance (local or [MongoDB Atlas](https://www.mongodb.com/atlas))
+
+### Backend
+
+```bash
+cd book-store
+
+# Install dependencies
+npm install          # or: bun install
+
+# Create a .env file in this directory
+cat > .env <<'EOF'
+PORT=5555
+mongoDBURL=mongodb://localhost:27017/bookstore
+EOF
+
+# Start the server
+node backend/index.js    # or: bun run backend/index.js
+```
+
+The API will be available at `http://localhost:5555/books`.
+
+### Frontend
+
+```bash
+cd book-store/frontend
+
+# Install dependencies
+npm install          # or: bun install
+
+# Start the Vite dev server (proxies /books → localhost:5555 automatically)
+npm run dev          # or: bun run dev
+```
+
+The UI will be available at `http://localhost:5173`.
+
+---
+
+## API Reference
+
+Base path: `/books`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/books` | List all books |
+| `POST` | `/books` | Create a book |
+| `GET` | `/books/:id` | Get a single book |
+| `PUT` | `/books/:id` | Update a book |
+| `DELETE` | `/books/:id` | Delete a book |
+
+**Book object**
+
+```json
+{
+  "title": "The Pragmatic Programmer",
+  "author": "Andrew Hunt",
+  "publishYear": 1999
+}
+```
+
+---
+
+## Security measures
+
+| Area | Measure |
+|---|---|
+| HTTP headers | `helmet` — sets HSTS, X-Frame-Options, CSP, X-Content-Type-Options, etc. |
+| CORS | Configurable origin whitelist via `ALLOWED_ORIGINS` env var |
+| Rate limiting | 100 requests / 15 min per IP (`express-rate-limit`) |
+| Payload size | Requests larger than 10 KB are rejected |
+| NoSQL injection | `express-mongo-sanitize` strips `$` and `.` from user input |
+| Input validation | Field trimming, max lengths, year range enforced on every write |
+| ObjectId safety | All `:id` params validated before hitting the database |
+| Error messages | Only generic messages returned in production (no stack traces) |
+| Non-root container | Backend runs as a dedicated non-root `appuser` |
+| Network isolation | MongoDB and backend are on an internal Docker network — not exposed to the host |
+| Secrets | `.env` is git-ignored; only `.env.example` is committed |
