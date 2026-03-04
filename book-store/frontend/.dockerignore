@@ -1,0 +1,9 @@
+node_modules
+dist
+npm-debug.log
+.npm
+.env
+.env.*
+.git
+.gitignore
+bun.lockb
