@@ -9,22 +9,12 @@ RUN bun install --frozen-lockfile 2>/dev/null || bun install
 COPY . .
 RUN bun run build
 
-# ── Runtime stage: serve built assets with nginx ───────────────────────────────
-FROM nginx:1.27-alpine AS runner
+# ── Export stage: copy built assets to a shared volume for nginx ───────────────
+FROM alpine:3.19 AS runner
+WORKDIR /dist
 
-# Remove default nginx config
-RUN rm /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist .
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/app.conf
-
-# Copy built assets from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# nginx runs as root by default; restrict permissions on html dir
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# The entrypoint copies the built files into the shared volume mount point
+# and then exits — nginx picks them up from the volume
+CMD ["sh", "-c", "cp -r /dist/. /usr/share/nginx/html/ && echo 'Frontend assets copied.'"]

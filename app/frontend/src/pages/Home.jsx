@@ -38,6 +38,13 @@ const Home = () => {
       <div className='flex items-center justify-between mb-6'>
         <h1 className='text-3xl font-bold text-gray-900'>📚 Books Inventory</h1>
         <div className='flex items-center gap-3'>
+          <Link
+            to='/books/recognize'
+            className='flex items-center gap-1 bg-sky-500 hover:bg-sky-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition'
+            title='Scan a book with AI'
+          >
+            📷 Scan Book
+          </Link>
           <Link to='/books/create'>
             <MdOutlineAddBox className='text-sky-500 hover:text-sky-700 text-4xl transition' />
           </Link>

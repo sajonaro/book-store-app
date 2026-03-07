@@ -1,0 +1,9 @@
+api:
+  host: 0.0.0.0
+  port: 8000
+openai:
+  model: gpt-4o
+  max_tokens: 1024
+  temperature: 0
+  image_detail: high
+  api_key_file: credentials/openai_key.txt

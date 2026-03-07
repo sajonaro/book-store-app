@@ -8,15 +8,23 @@ export function isValidUUID(id) {
 // Sanitize and coerce all book fields from request body
 export function sanitizeBook(body) {
     return {
-        title:        typeof body.title === 'string'       ? body.title.trim().slice(0, 500)       : undefined,
-        author:       typeof body.author === 'string'      ? body.author.trim().slice(0, 500)      : undefined,
-        isbn:         typeof body.isbn === 'string'        ? body.isbn.trim().slice(0, 20)         : null,
-        publisher:    typeof body.publisher === 'string'   ? body.publisher.trim().slice(0, 255)   : null,
-        publish_year: body.publish_year != null            ? Number(body.publish_year)              : null,
-        genre:        typeof body.genre === 'string'       ? body.genre.trim().slice(0, 100)       : null,
-        description:  typeof body.description === 'string' ? body.description.trim()               : null,
-        price:        body.price != null                   ? parseFloat(body.price)                : 0.00,
-        stock:        body.stock != null                   ? parseInt(body.stock, 10)               : 0,
+        title:           typeof body.title === 'string'            ? body.title.trim().slice(0, 500)            : undefined,
+        author:          typeof body.author === 'string'           ? body.author.trim().slice(0, 500)           : undefined,
+        isbn:            typeof body.isbn === 'string'             ? body.isbn.trim().slice(0, 20)              : null,
+        publisher:       typeof body.publisher === 'string'        ? body.publisher.trim().slice(0, 255)        : null,
+        publish_year:    body.publish_year != null                 ? Number(body.publish_year)                  : null,
+        genre:           typeof body.genre === 'string'            ? body.genre.trim().slice(0, 100)            : null,
+        description:     typeof body.description === 'string'      ? body.description.trim()                    : null,
+        price:           body.price != null                        ? parseFloat(body.price)                     : 0.00,
+        stock:           body.stock != null                        ? parseInt(body.stock, 10)                   : 0,
+        // New fields
+        language:        typeof body.language === 'string'         ? body.language.trim().slice(0, 100)         : null,
+        shelf_name:      typeof body.shelf_name === 'string'       ? body.shelf_name.trim().slice(0, 100)       : null,
+        shelf_number:    typeof body.shelf_number === 'string'     ? body.shelf_number.trim().slice(0, 50)      : null,
+        // cover_thumbnail — base64 data-URI; pass through as-is (size validated elsewhere)
+        cover_thumbnail: typeof body.cover_thumbnail === 'string' && body.cover_thumbnail.length > 0
+            ? body.cover_thumbnail
+            : undefined,
     };
 }
 

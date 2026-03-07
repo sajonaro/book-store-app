@@ -4,6 +4,9 @@ import { useParams } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 import Spinner from '../components/Spinner';
 
+const PLACEHOLDER =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="280" viewBox="0 0 200 280"><rect width="200" height="280" fill="%23e2e8f0"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="60" fill="%2394a3b8">📚</text></svg>';
+
 const InfoRow = ({ label, value }) =>
   value != null && value !== '' ? (
     <div className='flex flex-col sm:flex-row sm:gap-4 py-3 border-b border-gray-100 last:border-0'>
@@ -32,6 +35,8 @@ const ShowBook = () => {
     fetchData();
   }, [id]);
 
+  const thumb = book.cover_thumbnail || PLACEHOLDER;
+
   return (
     <div className='min-h-screen bg-gray-50 p-6'>
       <BackButton />
@@ -40,51 +45,80 @@ const ShowBook = () => {
       {loading ? (
         <Spinner />
       ) : (
-        <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-6 max-w-2xl'>
-          <div className='flex items-start justify-between mb-4'>
-            <div>
-              <h2 className='text-2xl font-bold text-gray-900'>{book.title}</h2>
-              <p className='text-gray-500 mt-1'>{book.author}</p>
+        <div className='bg-white rounded-2xl shadow-sm border border-gray-200 max-w-2xl overflow-hidden'>
+          {/* Cover image banner */}
+          <div className='flex gap-0'>
+            <div className='w-36 flex-shrink-0 bg-gray-100'>
+              <img
+                src={thumb}
+                alt={`Cover of ${book.title}`}
+                className='w-full h-full object-cover min-h-48'
+                onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
+              />
             </div>
-            <div className='text-right'>
-              <p className='text-2xl font-bold text-sky-600'>
-                ${parseFloat(book.price || 0).toFixed(2)}
-              </p>
-              {book.stock > 0 ? (
-                <span className='text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full'>
-                  {book.stock} in stock
-                </span>
-              ) : (
-                <span className='text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full'>
-                  Out of stock
-                </span>
-              )}
+            <div className='p-6 flex-1 flex flex-col justify-between min-w-0'>
+              <div>
+                <h2 className='text-2xl font-bold text-gray-900 truncate'>{book.title}</h2>
+                <p className='text-gray-500 mt-1'>{book.author}</p>
+                {/* Badges */}
+                <div className='flex flex-wrap gap-2 mt-2'>
+                  {book.genre && (
+                    <span className='text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full'>
+                      {book.genre}
+                    </span>
+                  )}
+                  {book.language && (
+                    <span className='text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full'>
+                      🌐 {book.language}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className='mt-4'>
+                <p className='text-2xl font-bold text-sky-600'>
+                  ${parseFloat(book.price || 0).toFixed(2)}
+                </p>
+                {book.stock > 0 ? (
+                  <span className='text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full'>
+                    {book.stock} in stock
+                  </span>
+                ) : (
+                  <span className='text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full'>
+                    Out of stock
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          {book.genre && (
-            <span className='inline-block text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full mb-4'>
-              {book.genre}
-            </span>
-          )}
+          <div className='px-6 pb-6'>
+            {book.description && (
+              <p className='text-gray-700 mb-4 leading-relaxed mt-4'>{book.description}</p>
+            )}
 
-          {book.description && (
-            <p className='text-gray-700 mb-4 leading-relaxed'>{book.description}</p>
-          )}
-
-          <div className='border-t border-gray-100 pt-4'>
-            <InfoRow label='ISBN' value={book.isbn} />
-            <InfoRow label='Publisher' value={book.publisher} />
-            <InfoRow label='Publish Year' value={book.publish_year} />
-            <InfoRow label='Book ID' value={book.id} />
-            <InfoRow
-              label='Created'
-              value={book.created_at ? new Date(book.created_at).toLocaleDateString() : null}
-            />
-            <InfoRow
-              label='Last Updated'
-              value={book.updated_at ? new Date(book.updated_at).toLocaleDateString() : null}
-            />
+            <div className='border-t border-gray-100 pt-4'>
+              <InfoRow label='ISBN' value={book.isbn} />
+              <InfoRow label='Publisher' value={book.publisher} />
+              <InfoRow label='Publish Year' value={book.publish_year} />
+              <InfoRow label='Language' value={book.language} />
+              <InfoRow
+                label='Location'
+                value={
+                  book.shelf_name || book.shelf_number
+                    ? [book.shelf_name, book.shelf_number].filter(Boolean).join(' · ')
+                    : null
+                }
+              />
+              <InfoRow label='Book ID' value={book.id} />
+              <InfoRow
+                label='Created'
+                value={book.created_at ? new Date(book.created_at).toLocaleDateString() : null}
+              />
+              <InfoRow
+                label='Last Updated'
+                value={book.updated_at ? new Date(book.updated_at).toLocaleDateString() : null}
+              />
+            </div>
           </div>
         </div>
       )}

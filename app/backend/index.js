@@ -15,6 +15,10 @@ const PORT = process.env.PORT || 5555;
 
 const app = express();
 
+// Trust the first proxy (nginx) so express-rate-limit can read the real IP
+// from X-Forwarded-For without throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet());
 
@@ -44,8 +48,8 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Body parsing with payload size limit to prevent DoS
-app.use(express.json({ limit: '10kb' }));
+// Body parsing with payload size limit — 5 MB to allow base64 cover thumbnails in JSON
+app.use(express.json({ limit: '5mb' }));
 
 // Routes
 app.use('/auth', authRoute);

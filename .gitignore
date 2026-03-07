@@ -1,4 +1,4 @@
-# Logs
+# ── Logs ────────────────────────────────────────────────────────────────────
 logs
 *.log
 npm-debug.log*
@@ -7,17 +7,22 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# ── Node.js ──────────────────────────────────────────────────────────────────
 node_modules
 dist
 dist-ssr
 *.local
 
-# Environment files — never commit secrets; commit .env.example instead
+# Lock files — project uses bun; ignore npm/yarn lockfiles to avoid conflicts
+package-lock.json
+yarn.lock
+
+# ── Environment files — never commit secrets; commit .env.example instead ───
 .env
 .env.*
 !.env.example
 
-# Editor directories and files
+# ── Editor directories and files ─────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -27,3 +32,120 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ── Credentials / secrets ─────────────────────────────────────────────────────
+openai_key.txt
+credentials/
+
+# ── Test output files ─────────────────────────────────────────────────────────
+app/ai-api/output/
+
+# ── Python ───────────────────────────────────────────────────────────────────
+# Byte-compiled / optimised / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# Pyright / mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
+pyrightconfig.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+# .python-version  (already above)
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Spyder
+.spyderproject.db
+.spyproject
+
+# Rope
+.ropeproject
+
+# mkdocs
+/site
+
+# pdm
+.pdm.toml
+.pdm-python
+.pdm-build/
+
+# uv
+.uv/
+uv.lock
+
+# Ruff
+.ruff_cache/

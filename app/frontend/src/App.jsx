@@ -7,6 +7,7 @@ import EditBook from './pages/EditBook';
 import DeleteBook from './pages/DeleteBook';
 import LoginPage from './pages/LoginPage';
 import SearchPage from './pages/SearchPage';
+import RecognizePage from './pages/RecognizePage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App = () => {
@@ -25,6 +26,14 @@ const App = () => {
         element={
           <ProtectedRoute adminOnly>
             <Home />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path='/books/recognize'
+        element={
+          <ProtectedRoute adminOnly>
+            <RecognizePage />
           </ProtectedRoute>
         }
       />

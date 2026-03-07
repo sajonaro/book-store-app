@@ -1,3 +1,69 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ─── OpenAI-inspired base resets ─────────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      Oxygen, Ubuntu, 'Helvetica Neue', Arial, sans-serif;
+    height: 100%;
+    width: 100%;
+  }
+
+  fieldset {
+    margin: 0;
+    padding: 15px 20px;
+    border: none;
+  }
+
+  /* Remove default outlines — visual focus is handled by Tailwind focus rings */
+  button:focus,
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: 0;
+  }
+
+  textarea {
+    border: none;
+    overflow: auto;
+    outline: 0;
+    box-shadow: none;
+    resize: none;
+  }
+}
+
+/* ─── Utility classes ──────────────────────────────────────────────────── */
+@layer utilities {
+  .no-selection {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  .animate-pop {
+    animation: pop 0.3s ease-out both;
+  }
+}
+
+/* ─── Pop keyframe ─────────────────────────────────────────────────────── */
+@keyframes pop {
+  0%   { transform: scale(0); }
+  70%  { transform: scale(1.08); }
+  80%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}

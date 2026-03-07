@@ -44,7 +44,7 @@ Build a full-stack inventory and catalog system on top of the existing React/Exp
 
 ## Tasks
 
-### T1: Replace MongoDB with PostgreSQL
+### ~~T1: Replace MongoDB with PostgreSQL~~ ✅ DONE
 
 **What:** Swap Mongoose for `pg` (node-postgres). Connect to PostgreSQL in `index.js`. Create the `books` table on startup if it doesn't exist.
 
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS books (
 
 ---
 
-### T2: Update Input Validation
+### ~~T2: Update Input Validation~~ ✅ DONE
 
 **What:** Replace MongoDB ObjectId validation (`mongoose.Types.ObjectId.isValid`) with UUID format validation. Update `sanitizeBook` to include all new fields: `isbn`, `publisher`, `publish_year`, `genre`, `description`, `price`, `stock`.
 
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS books (
 
 ---
 
-### T3: Add Elasticsearch Service and Indexing
+### ~~T3: Add Elasticsearch Service and Indexing~~ ✅ DONE
 
 **What:** Add Elasticsearch 8 to Docker Compose. Create a `searchService.js` that indexes books on create/update and removes entries on delete. Wire the service into the books route.
 
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS books (
 
 ---
 
-### T4: Search Endpoint
+### ~~T4: Search Endpoint~~ ✅ DONE
 
 **What:** Add `?q=` query parameter support to `GET /books`. When `q` is present, delegate to Elasticsearch; otherwise fall back to a full `SELECT` from PostgreSQL.
 
@@ -137,17 +137,38 @@ CREATE TABLE IF NOT EXISTS books (
 
 ---
 
-### T5: AI Photo Recognition Endpoint
+### ~~T5: AI Photo Recognition Endpoint~~ ✅ DONE
 
-**What:** Create `POST /books/recognize` that accepts a photo upload (`multipart/form-data`, field name `photo`), sends it to the Anthropic Claude vision API, and returns extracted metadata as JSON.
+**What:** Expose `POST /books/recognize` that accepts one or more book photos (`multipart/form-data`, field name `photos`), forwards them to a dedicated Python **ai-api** sidecar service, which sends the images to **OpenAI GPT-4o vision** and returns extracted book metadata as JSON.
+
+**Architecture:**
+```
+CreateBooks.jsx
+  → POST /books/recognize  (Express backend, multer)
+  → POST /recognize        (FastAPI ai-api sidecar, port 8000)
+  → OpenAI GPT-4o vision   (BOOK_METADATA_EXTRACTION_PROMPT)
+  → { data: { title, author, isbn, publisher, year, genre, description } }
+```
+
+**ai-api sidecar** (`app/ai-api/`):
+- Python 3.11 / FastAPI / uvicorn
+- `POST /recognize` — accepts multipart images, encodes to base64, calls `openai.chat.completions.create` with all images as `image_url` parts
+- `GET /health` — used by Docker health check
+- Config: `config.yaml` (model `gpt-4o`, `image_detail: high`, `max_tokens: 1024`)
+- API key read from `credentials/openai_key.txt` (volume-mounted read-only)
+- Prompt: `BOOK_METADATA_EXTRACTION_PROMPT` in `prompts/extraction.py` — instructs GPT-4o to return strict JSON, `null` for unknown fields; may infer genre from cover art and generate a short description
 
 **Files:**
-- `book-store/backend/routes/booksRoute.js`
-- `book-store/backend/services/bookRecognition.js` *(new)*
-- `book-store/backend/package.json` (add `@anthropic-ai/sdk`, `multer`)
-- `book-store/.env.example`
-
-**Prompt strategy:** System prompt instructs Claude to respond ONLY with a JSON object. Unknown fields return `null`.
+- `app/ai-api/api.py` — FastAPI app with `/recognize` + `/health`
+- `app/ai-api/src/openai_client.py` — `create_client()`, `analyze_multiple_images()`
+- `app/ai-api/src/config.py` — YAML config loader, `get_openai_config()`
+- `app/ai-api/config.yaml` — API + OpenAI settings
+- `app/ai-api/prompts/extraction.py` — `BOOK_METADATA_EXTRACTION_PROMPT`
+- `app/ai-api/requirements.txt` — `openai`, `fastapi`, `uvicorn`, `python-multipart`, `PyYAML`
+- `app/ai-api/Dockerfile` — Python 3.11 image, `CMD ["python", "api.py"]`
+- `app/docker-compose.yml` — added `ai-api` service; `backend` depends on it (health condition); `AI_API_URL=http://ai-api:8000` env var passed to backend
+- `app/backend/routes/booksRoute.js` — `POST /books/recognize` (declared before `/:id`); uses `multer` memoryStorage (10 MB, images only); rate-limited to 10 req/min per IP; forwards files to ai-api via native `fetch` + `FormData`
+- `app/.env.example` — documents `OPENAI_API_KEY` and `AI_API_URL`
 
 **Response shape:**
 ```json
@@ -159,21 +180,23 @@ CREATE TABLE IF NOT EXISTS books (
     "publisher": "George Allen & Unwin",
     "year": 1937,
     "genre": "Fantasy",
-    "description": "A fantasy novel..."
+    "description": "A fantasy novel and the prelude to The Lord of the Rings."
   }
 }
 ```
+On AI failure the endpoint still returns `200` with all fields `null` plus an `"error"` key (never a 5xx for unrecognized images).
 
-**Rate limit:** Apply a stricter limiter — 10 requests / minute per IP — on this endpoint only.
+**Rate limit:** 10 requests / minute per IP on `/books/recognize` only (separate `express-rate-limit` instance).
 
 **Verify:**
 - Upload a JPEG of a book cover → response contains populated `title` and `author`
-- Upload a blank image → fields return `null` but endpoint responds `200` (not an error)
-- Exceeding rate limit returns `429`
+- Upload a blank/unreadable image → fields return `null` but endpoint responds `200` (not an error)
+- Exceeding 10 requests/minute returns `429`
+- `docker compose up` starts the `ai-api` container and it passes its health check before `backend` starts
 
 ---
 
-### T6: Extend Frontend Create/Edit Forms
+### ~~T6: Extend Frontend Create/Edit Forms~~ ✅ DONE
 
 **What:** Update `CreateBooks.jsx` and `EditBook.jsx` to include fields for `isbn`, `publisher`, `publish_year`, `genre`, `description`, `price`, `stock`. Add a photo upload button on `CreateBooks.jsx` that calls `/books/recognize` and pre-fills the form fields.
 
@@ -188,7 +211,7 @@ CREATE TABLE IF NOT EXISTS books (
 
 ---
 
-### T7: Update Docker Compose
+### ~~T7: Update Docker Compose~~ ✅ DONE
 
 **What:** Replace `mongo` service with `postgres` and add `elastic`. Update `backend` environment variables. Add health checks for all services. Ensure correct startup order: `postgres` → `backend` → `frontend`, `elastic` starts in parallel with `postgres`.
 
@@ -211,7 +234,7 @@ frontend    → Nginx :${FRONTEND_PORT:-8080}→:80 (frontend_net)
 
 ---
 
-### T8: Update Book Detail Page
+### ~~T8: Update Book Detail Page~~ ✅ DONE
 
 **What:** Update `ShowBook.jsx` to display all new fields: `isbn`, `publisher`, `publish_year`, `genre`, `description`, `price`, and stock availability status.
 
@@ -243,7 +266,7 @@ Upload photo → POST /books/recognize → POST /books → GET /books?q=<title> 
 
 ---
 
-### T10: Login Page
+### ~~T10: Login Page~~ ✅ DONE
 
 **What:** Add a login page as the app entry point. Users choose a role from a dropdown: **Admin** or **User (Buyer)**.
 
@@ -299,7 +322,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 ---
 
-### T11: Search Page (Buyer View)
+### ~~T11: Search Page (Buyer View)~~ ✅ DONE
 
 **What:** Create a standalone search page accessible to unauthenticated users (role = "user"). The page presents a single centered search bar styled after Google Search.
 
@@ -323,7 +346,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 ---
 
-### T12: Frontend Tailwind CSS Refactor (Consistent Design System)
+### ~~T12: Frontend Tailwind CSS Refactor (Consistent Design System)~~ ✅ DONE
 
 **What:** Refactor all frontend pages and components to use Tailwind CSS exclusively, establishing a consistent visual language across the entire app. Remove any inline styles and ad-hoc class combinations that deviate from the design system.
 

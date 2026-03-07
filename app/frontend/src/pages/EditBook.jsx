@@ -1,9 +1,12 @@
 import axios from 'axios';
 import { useSnackbar } from 'notistack';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 import Spinner from '../components/Spinner';
+
+const PLACEHOLDER =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160"><rect width="120" height="160" fill="%23e2e8f0"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="40" fill="%2394a3b8">📚</text></svg>';
 
 const Field = ({ label, required, children }) => (
   <div>
@@ -27,7 +30,12 @@ const EditBook = () => {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [language, setLanguage] = useState('');
+  const [shelfName, setShelfName] = useState('');
+  const [shelfNumber, setShelfNumber] = useState('');
+  const [coverThumb, setCoverThumb] = useState(null); // null = keep existing
   const [loading, setLoading] = useState(false);
+  const fileRef = useRef(null);
   const navigate = useNavigate();
   const { id } = useParams();
   const { enqueueSnackbar } = useSnackbar();
@@ -47,6 +55,10 @@ const EditBook = () => {
         setDescription(d.description || '');
         setPrice(d.price != null ? String(d.price) : '');
         setStock(d.stock != null ? String(d.stock) : '');
+        setLanguage(d.language || '');
+        setShelfName(d.shelf_name || '');
+        setShelfNumber(d.shelf_number || '');
+        if (d.cover_thumbnail) setCoverThumb(d.cover_thumbnail);
       } catch (error) {
         enqueueSnackbar('Failed to load book data', { variant: 'error' });
         console.error(error);
@@ -56,6 +68,14 @@ const EditBook = () => {
     };
     fetchData();
   }, [id]);
+
+  const handleCoverChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setCoverThumb(reader.result);
+    reader.readAsDataURL(file);
+  };
 
   const handleEditBook = async () => {
     const data = {
@@ -68,6 +88,10 @@ const EditBook = () => {
       description: description || undefined,
       price: price !== '' ? Number(price) : 0,
       stock: stock !== '' ? Number(stock) : 0,
+      language: language || undefined,
+      shelf_name: shelfName || undefined,
+      shelf_number: shelfNumber || undefined,
+      cover_thumbnail: coverThumb || undefined,
     };
     setLoading(true);
     try {
@@ -90,6 +114,42 @@ const EditBook = () => {
       {loading && <Spinner />}
 
       <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-6 max-w-2xl mx-auto'>
+        {/* Cover thumbnail preview */}
+        <div className='flex items-start gap-4 mb-6'>
+          <img
+            src={coverThumb || PLACEHOLDER}
+            alt='Book cover'
+            className='w-24 h-32 object-cover rounded-lg border border-gray-200 flex-shrink-0'
+            onError={(e) => { e.currentTarget.src = PLACEHOLDER; }}
+          />
+          <div className='flex flex-col gap-2 justify-end h-32'>
+            <p className='text-sm text-gray-500'>Book Cover</p>
+            <button
+              type='button'
+              onClick={() => fileRef.current?.click()}
+              className='text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition'
+            >
+              Change Image
+            </button>
+            {coverThumb && (
+              <button
+                type='button'
+                onClick={() => setCoverThumb(null)}
+                className='text-xs text-red-400 hover:text-red-600 transition'
+              >
+                Remove
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type='file'
+              accept='image/*'
+              className='hidden'
+              onChange={handleCoverChange}
+            />
+          </div>
+        </div>
+
         <div className='grid grid-cols-1 sm:grid-cols-2 gap-5'>
           <Field label='Title' required>
             <input type='text' value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
@@ -109,11 +169,21 @@ const EditBook = () => {
           <Field label='Genre'>
             <input type='text' value={genre} onChange={(e) => setGenre(e.target.value)} className={inputCls} />
           </Field>
+          <Field label='Language'>
+            <input type='text' placeholder='e.g. English, Spanish' value={language} onChange={(e) => setLanguage(e.target.value)} className={inputCls} />
+          </Field>
           <Field label='Price ($)'>
             <input type='number' min='0' step='0.01' value={price} onChange={(e) => setPrice(e.target.value)} className={inputCls} />
           </Field>
           <Field label='Stock'>
             <input type='number' min='0' step='1' value={stock} onChange={(e) => setStock(e.target.value)} className={inputCls} />
+          </Field>
+          {/* Location */}
+          <Field label='Shelf Name'>
+            <input type='text' placeholder='e.g. Fiction A' value={shelfName} onChange={(e) => setShelfName(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label='Shelf Number'>
+            <input type='text' placeholder='e.g. 3' value={shelfNumber} onChange={(e) => setShelfNumber(e.target.value)} className={inputCls} />
           </Field>
           <div className='sm:col-span-2'>
             <Field label='Description'>

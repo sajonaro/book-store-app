@@ -19,13 +19,14 @@ async function ensureIndex() {
         body: JSON.stringify({
           mappings: {
             properties: {
-              title:       { type: 'text' },
-              author:      { type: 'text' },
-              genre:       { type: 'keyword' },
-              description: { type: 'text' },
-              publisher:   { type: 'text' },
-              isbn:        { type: 'keyword' },
-              publish_year:{ type: 'integer' },
+              title:        { type: 'text' },
+              author:       { type: 'text' },
+              genre:        { type: 'keyword' },
+              description:  { type: 'text' },
+              publisher:    { type: 'text' },
+              isbn:         { type: 'keyword' },
+              publish_year: { type: 'integer' },
+              language:     { type: 'keyword' },
             },
           },
         }),
@@ -54,6 +55,7 @@ async function indexBook(book) {
         genre:        book.genre,
         description:  book.description,
         publish_year: book.publish_year,
+        language:     book.language,
       }),
     });
   } catch (err) {
@@ -85,7 +87,7 @@ async function searchBooks(query) {
         query: {
           multi_match: {
             query,
-            fields: ['title^3', 'author^2', 'description', 'publisher', 'genre'],
+            fields: ['title^3', 'author^2', 'description', 'publisher', 'genre', 'language^2'],
             fuzziness: 'AUTO',
           },
         },
