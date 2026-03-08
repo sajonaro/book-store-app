@@ -26,29 +26,39 @@ const DeleteBook = () => {
   };
 
   return (
-    <div className='min-h-screen bg-gray-50 p-6'>
-      <BackButton />
-      <h1 className='text-3xl font-bold text-gray-900 my-6'>Delete Book</h1>
+    <div className='min-h-screen' style={{ backgroundColor: 'var(--oai-bg)' }}>
+      <div className='max-w-md mx-auto px-6 py-8'>
+        <BackButton />
+        <h1 className='text-2xl font-semibold mt-6 mb-6' style={{ color: 'var(--oai-text)' }}>
+          Delete Book
+        </h1>
 
-      {loading && <Spinner />}
+        {loading && <Spinner />}
 
-      <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto text-center'>
-        <div className='text-5xl mb-4'>🗑️</div>
-        <h3 className='text-xl font-semibold text-gray-900 mb-2'>
-          Are you sure you want to delete this book?
-        </h3>
-        <p className='text-gray-500 text-sm mb-8'>
-          This action cannot be undone.
-        </p>
-        <div className='flex gap-3 justify-center'>
-          <button
-            onClick={handleDeleteBook}
-            disabled={loading}
-            className='bg-red-500 hover:bg-red-600 text-white font-semibold px-6 py-2 rounded-lg transition disabled:opacity-50'
-          >
-            Yes, Delete
-          </button>
-          <BackButton destination='/home' />
+        <div
+          className='rounded-xl p-8 text-center animate-fade-in'
+          style={{
+            backgroundColor: 'var(--oai-surface)',
+            border: '1px solid var(--oai-border)',
+          }}
+        >
+          <div className='text-5xl mb-4'>🗑️</div>
+          <h3 className='text-lg font-semibold mb-2' style={{ color: 'var(--oai-text)' }}>
+            Are you sure you want to delete this book?
+          </h3>
+          <p className='text-sm mb-8' style={{ color: 'var(--oai-muted)' }}>
+            This action cannot be undone.
+          </p>
+          <div className='flex gap-3 justify-center'>
+            <button
+              onClick={handleDeleteBook}
+              disabled={loading}
+              className='btn-danger px-6 py-2'
+            >
+              Yes, Delete
+            </button>
+            <BackButton destination='/home' />
+          </div>
         </div>
       </div>
     </div>

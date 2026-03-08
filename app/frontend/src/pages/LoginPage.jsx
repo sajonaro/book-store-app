@@ -44,19 +44,37 @@ const LoginPage = () => {
   };
 
   return (
-    <div className='min-h-screen flex items-center justify-center bg-gray-50'>
-      <div className='bg-white rounded-2xl shadow-lg p-10 w-full max-w-md'>
+    <div
+      className='min-h-screen flex items-center justify-center px-4'
+      style={{ backgroundColor: 'var(--oai-bg)' }}
+    >
+      <div
+        className='w-full max-w-sm animate-fade-in'
+        style={{
+          backgroundColor: 'var(--oai-surface)',
+          border: '1px solid var(--oai-border)',
+          borderRadius: 'var(--oai-radius-xl)',
+          padding: '2.5rem 2rem',
+        }}
+      >
         {/* Logo / title */}
-        <h1 className='text-4xl font-bold text-center text-sky-600 mb-2'>📚 BookStore</h1>
-        <p className='text-center text-gray-500 mb-8'>Inventory & Catalog System</p>
+        <div className='text-center mb-8'>
+          <div className='text-4xl mb-3'>📚</div>
+          <h1 className='text-2xl font-semibold' style={{ color: 'var(--oai-text)' }}>
+            BookStore
+          </h1>
+          <p className='text-sm mt-1' style={{ color: 'var(--oai-muted)' }}>
+            Inventory & Catalog System
+          </p>
+        </div>
 
         {/* Role selector */}
-        <div className='mb-6'>
-          <label className='block text-sm font-medium text-gray-700 mb-1'>I am a…</label>
+        <div className='mb-5'>
+          <label className='oai-label'>I am a…</label>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className='w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400'
+            className='oai-input'
           >
             <option value='user'>User (Buyer)</option>
             <option value='admin'>Admin</option>
@@ -66,46 +84,59 @@ const LoginPage = () => {
         {role === 'admin' ? (
           <form onSubmit={handleAdminLogin} className='space-y-4'>
             <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>Email</label>
+              <label className='oai-label'>Email</label>
               <input
                 type='email'
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder='admin@bookstore.com'
-                className='w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400'
+                className='oai-input'
               />
             </div>
             <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>Password</label>
+              <label className='oai-label'>Password</label>
               <input
                 type='password'
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder='••••••••'
-                className='w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400'
+                className='oai-input'
               />
             </div>
             <button
               type='submit'
               disabled={loading}
-              className='w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 rounded-lg transition disabled:opacity-50'
+              className='btn-primary w-full mt-2'
+              style={{ padding: '0.625rem 1rem' }}
             >
-              {loading ? 'Signing in…' : 'Sign In as Admin'}
+              {loading ? 'Signing in…' : 'Sign in as Admin'}
             </button>
           </form>
         ) : (
           <div className='text-center'>
-            <p className='text-gray-500 mb-6 text-sm'>
+            <p className='text-sm mb-5' style={{ color: 'var(--oai-muted)' }}>
               No account needed. Browse and search the catalog freely.
             </p>
             <button
               onClick={handleContinueAsUser}
-              className='w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 rounded-lg transition'
+              className='btn-primary w-full'
+              style={{ padding: '0.625rem 1rem' }}
             >
               Continue as Buyer →
             </button>
           </div>
         )}
+
+        {/* Divider line */}
+        <div
+          className='mt-8 pt-5 text-center text-xs'
+          style={{
+            borderTop: '1px solid var(--oai-border)',
+            color: 'var(--oai-subtle)',
+          }}
+        >
+          BookStore © {new Date().getFullYear()}
+        </div>
       </div>
     </div>
   );

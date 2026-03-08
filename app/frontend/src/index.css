@@ -2,23 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── OpenAI-inspired base resets ─────────────────────────────────────── */
+/* ─── OpenAI-inspired CSS variables ───────────────────────────────────── */
+:root {
+  --oai-bg:           #0d0d0d;
+  --oai-surface:      #161616;
+  --oai-surface-2:    #1c1c1c;
+  --oai-hover:        #212121;
+  --oai-border:       #2a2a2a;
+  --oai-border-2:     #383838;
+  --oai-text:         #ececec;
+  --oai-muted:        #8e8ea0;
+  --oai-subtle:       #666680;
+  --oai-green:        #10a37f;
+  --oai-green-hover:  #0d8c6d;
+  --oai-red:          #ef4444;
+  --oai-radius:       8px;
+  --oai-radius-lg:    12px;
+  --oai-radius-xl:    16px;
+}
+
+/* ─── Base resets ──────────────────────────────────────────────────────── */
 @layer base {
   *,
   *::before,
   *::after {
+    box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   html,
-  body {
+  body,
+  #root {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto,
-      Oxygen, Ubuntu, 'Helvetica Neue', Arial, sans-serif;
-    height: 100%;
+    min-height: 100%;
     width: 100%;
+    background-color: var(--oai-bg);
+    color: var(--oai-text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      Oxygen, Ubuntu, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
   }
 
   fieldset {
@@ -27,7 +52,6 @@
     border: none;
   }
 
-  /* Remove default outlines — visual focus is handled by Tailwind focus rings */
   button:focus,
   input:focus,
   select:focus,
@@ -41,6 +65,132 @@
     outline: 0;
     box-shadow: none;
     resize: none;
+  }
+
+  /* Select / option dark theme */
+  select option {
+    background-color: var(--oai-surface-2);
+    color: var(--oai-text);
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--oai-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--oai-border-2);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--oai-muted);
+  }
+}
+
+/* ─── OpenAI component utilities ───────────────────────────────────────── */
+@layer components {
+  /* --- Buttons --- */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 font-medium text-sm
+           px-4 py-2 rounded-lg transition-all duration-150 cursor-pointer
+           select-none;
+    background-color: var(--oai-green);
+    color: #fff;
+    border: 1px solid var(--oai-green);
+  }
+  .btn-primary:hover {
+    background-color: var(--oai-green-hover);
+    border-color: var(--oai-green-hover);
+  }
+  .btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 font-medium text-sm
+           px-4 py-2 rounded-lg transition-all duration-150 cursor-pointer
+           select-none;
+    background-color: transparent;
+    color: var(--oai-text);
+    border: 1px solid var(--oai-border-2);
+  }
+  .btn-secondary:hover {
+    background-color: var(--oai-hover);
+    border-color: var(--oai-border-2);
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 font-medium text-sm
+           px-4 py-2 rounded-lg transition-all duration-150 cursor-pointer
+           select-none;
+    background-color: transparent;
+    color: var(--oai-red);
+    border: 1px solid rgba(239,68,68,0.35);
+  }
+  .btn-danger:hover {
+    background-color: rgba(239,68,68,0.1);
+  }
+
+  /* --- Input / Select --- */
+  .oai-input {
+    @apply w-full text-sm px-4 py-2.5 rounded-lg transition-all duration-150;
+    background-color: var(--oai-surface-2);
+    color: var(--oai-text);
+    border: 1px solid var(--oai-border);
+  }
+  .oai-input::placeholder {
+    color: var(--oai-subtle);
+  }
+  .oai-input:focus {
+    border-color: var(--oai-border-2);
+    box-shadow: 0 0 0 3px rgba(16,163,127,0.18);
+    outline: none;
+  }
+
+  /* --- Card surface --- */
+  .oai-card {
+    background-color: var(--oai-surface);
+    border: 1px solid var(--oai-border);
+    border-radius: var(--oai-radius-xl);
+  }
+
+  /* --- Label --- */
+  .oai-label {
+    @apply block text-xs font-medium mb-1;
+    color: var(--oai-muted);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  /* --- Badge variants --- */
+  .badge-green {
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: rgba(16,163,127,0.15);
+    color: #10a37f;
+  }
+  .badge-red {
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: rgba(239,68,68,0.15);
+    color: #f87171;
+  }
+  .badge-blue {
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: rgba(96,165,250,0.15);
+    color: #60a5fa;
+  }
+  .badge-purple {
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: rgba(167,139,250,0.15);
+    color: #a78bfa;
+  }
+  .badge-gray {
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: var(--oai-surface-2);
+    color: var(--oai-muted);
   }
 }
 
@@ -58,12 +208,26 @@
   .animate-pop {
     animation: pop 0.3s ease-out both;
   }
+
+  .animate-fade-in {
+    animation: fade-in 0.25s ease-out both;
+  }
+
+  /* Divider color */
+  .oai-divider {
+    border-color: var(--oai-border);
+  }
 }
 
-/* ─── Pop keyframe ─────────────────────────────────────────────────────── */
+/* ─── Keyframes ────────────────────────────────────────────────────────── */
 @keyframes pop {
   0%   { transform: scale(0); }
   70%  { transform: scale(1.08); }
   80%  { transform: scale(0.96); }
   100% { transform: scale(1); }
+}
+
+@keyframes fade-in {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }

@@ -33,61 +33,97 @@ const Home = () => {
   };
 
   return (
-    <div className='min-h-screen bg-gray-50 p-6'>
-      {/* Top bar */}
-      <div className='flex items-center justify-between mb-6'>
-        <h1 className='text-3xl font-bold text-gray-900'>📚 Books Inventory</h1>
-        <div className='flex items-center gap-3'>
-          <Link
-            to='/books/recognize'
-            className='flex items-center gap-1 bg-sky-500 hover:bg-sky-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition'
-            title='Scan a book with AI'
-          >
-            📷 Scan Book
-          </Link>
-          <Link to='/books/create'>
-            <MdOutlineAddBox className='text-sky-500 hover:text-sky-700 text-4xl transition' />
-          </Link>
-          <button
-            onClick={handleSignOut}
-            className='text-sm text-gray-500 hover:text-red-600 font-medium transition'
-          >
-            Sign out
-          </button>
+    <div className='min-h-screen' style={{ backgroundColor: 'var(--oai-bg)' }}>
+      {/* Top nav */}
+      <header
+        style={{
+          backgroundColor: 'var(--oai-surface)',
+          borderBottom: '1px solid var(--oai-border)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+        }}
+      >
+        <div className='max-w-7xl mx-auto px-6 h-14 flex items-center justify-between'>
+          <h1 className='text-base font-semibold tracking-tight' style={{ color: 'var(--oai-text)' }}>
+            📚 BookStore
+          </h1>
+          <div className='flex items-center gap-3'>
+            <Link
+              to='/books/recognize'
+              className='btn-secondary text-xs px-3 py-1.5'
+            >
+              📷 Scan
+            </Link>
+            <Link
+              to='/books/create'
+              className='btn-primary text-xs px-3 py-1.5'
+            >
+              <MdOutlineAddBox className='text-base' />
+              Add Book
+            </Link>
+            <button
+              onClick={handleSignOut}
+              className='text-xs font-medium transition-colors'
+              style={{ color: 'var(--oai-muted)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--oai-red)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* View toggle */}
-      <div className='flex gap-2 mb-6'>
-        <button
-          onClick={() => setShowType('table')}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-            showType === 'table'
-              ? 'bg-sky-500 text-white'
-              : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          Table
-        </button>
-        <button
-          onClick={() => setShowType('card')}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-            showType === 'card'
-              ? 'bg-sky-500 text-white'
-              : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          Cards
-        </button>
-      </div>
+      {/* Main content */}
+      <main className='max-w-7xl mx-auto px-6 py-8'>
+        {/* Page title + view toggle */}
+        <div className='flex items-center justify-between mb-6'>
+          <div>
+            <h2 className='text-2xl font-semibold' style={{ color: 'var(--oai-text)' }}>
+              Inventory
+            </h2>
+            <p className='text-sm mt-0.5' style={{ color: 'var(--oai-muted)' }}>
+              {books.length} book{books.length !== 1 ? 's' : ''} in catalog
+            </p>
+          </div>
 
-      {loading ? (
-        <Spinner />
-      ) : showType === 'table' ? (
-        <BooksTable books={books} />
-      ) : (
-        <BooksCard books={books} />
-      )}
+          {/* View toggle */}
+          <div
+            className='flex items-center gap-1 p-1 rounded-lg'
+            style={{ backgroundColor: 'var(--oai-surface)', border: '1px solid var(--oai-border)' }}
+          >
+            {['table', 'card'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setShowType(type)}
+                className='px-3 py-1.5 text-sm font-medium rounded-md capitalize transition-all duration-150'
+                style={
+                  showType === type
+                    ? {
+                        backgroundColor: 'var(--oai-hover)',
+                        color: 'var(--oai-text)',
+                      }
+                    : {
+                        backgroundColor: 'transparent',
+                        color: 'var(--oai-muted)',
+                      }
+                }
+              >
+                {type === 'table' ? '⊞ Table' : '⊟ Cards'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <Spinner />
+        ) : showType === 'table' ? (
+          <BooksTable books={books} />
+        ) : (
+          <BooksCard books={books} />
+        )}
+      </main>
     </div>
   );
 };

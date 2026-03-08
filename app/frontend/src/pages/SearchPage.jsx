@@ -14,7 +14,6 @@ const SearchPage = () => {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Detect admin session for showing action buttons
   let isAdmin = false;
   try {
     const session = JSON.parse(localStorage.getItem('session'));
@@ -40,27 +39,31 @@ const SearchPage = () => {
   };
 
   return (
-    <div className='min-h-screen bg-gray-50'>
-      {/* Header */}
-      <div className='flex flex-col items-center pt-20 pb-10 px-4'>
-        <h1 className='text-5xl font-bold text-sky-600 mb-2'>📚 BookStore</h1>
-        <p className='text-gray-400 mb-10 text-lg'>Find your next great read</p>
+    <div className='min-h-screen' style={{ backgroundColor: 'var(--oai-bg)' }}>
+      {/* Header hero */}
+      <div className='flex flex-col items-center pt-24 pb-12 px-4'>
+        <div className='text-5xl mb-4'>📚</div>
+        <h1 className='text-4xl font-semibold mb-2 tracking-tight' style={{ color: 'var(--oai-text)' }}>
+          BookStore
+        </h1>
+        <p className='text-base mb-10' style={{ color: 'var(--oai-muted)' }}>
+          Find your next great read
+        </p>
 
-        {/* Google-like search bar */}
-        <form
-          onSubmit={handleSearch}
-          className='w-full max-w-2xl flex items-center gap-2'
-        >
+        {/* Search bar */}
+        <form onSubmit={handleSearch} className='w-full max-w-2xl flex items-center gap-2'>
           <input
             type='text'
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder='Search by title, author or genre…'
-            className='flex-1 border border-gray-300 rounded-full px-6 py-3 text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400'
+            className='oai-input flex-1 text-base'
+            style={{ borderRadius: '9999px', padding: '0.75rem 1.5rem' }}
           />
           <button
             type='submit'
-            className='bg-sky-500 hover:bg-sky-600 text-white px-6 py-3 rounded-full font-semibold shadow-sm transition'
+            className='btn-primary'
+            style={{ borderRadius: '9999px', padding: '0.75rem 1.5rem', fontSize: '0.9rem' }}
           >
             Search
           </button>
@@ -68,7 +71,7 @@ const SearchPage = () => {
       </div>
 
       {/* Results */}
-      <div className='max-w-4xl mx-auto px-4 pb-20'>
+      <div className='max-w-5xl mx-auto px-4 pb-24'>
         {loading && (
           <div className='flex justify-center'>
             <Spinner />
@@ -76,67 +79,89 @@ const SearchPage = () => {
         )}
 
         {!loading && !searched && (
-          <p className='text-center text-gray-400'>
-            Search for a book by title, author or genre
+          <p className='text-center text-sm' style={{ color: 'var(--oai-subtle)' }}>
+            Enter a title, author, or genre above to search the catalog
           </p>
         )}
 
         {!loading && searched && books.length === 0 && (
-          <p className='text-center text-gray-500'>
-            No books found for &ldquo;<strong>{query}</strong>&rdquo;
+          <p className='text-center' style={{ color: 'var(--oai-muted)' }}>
+            No books found for &ldquo;<strong style={{ color: 'var(--oai-text)' }}>{query}</strong>&rdquo;
           </p>
         )}
 
         {!loading && books.length > 0 && (
           <>
-            <p className='text-sm text-gray-500 mb-4'>
+            <p className='text-sm mb-5' style={{ color: 'var(--oai-muted)' }}>
               {books.length} result{books.length !== 1 ? 's' : ''} for &ldquo;
-              <strong>{query}</strong>&rdquo;
+              <span style={{ color: 'var(--oai-text)' }}>{query}</span>&rdquo;
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
               {books.map((book) => (
                 <div
                   key={book.id || book._id}
-                  className='border border-gray-200 rounded-xl bg-white p-4 shadow-sm hover:shadow-md transition'
+                  className='oai-card p-4 transition-all duration-150 animate-fade-in'
+                  style={{ cursor: 'default' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--oai-border-2)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--oai-border)')}
                 >
                   <div className='flex items-center gap-2 mb-1'>
-                    <PiBookOpenTextLight className='text-red-300 text-xl flex-shrink-0' />
-                    <h2 className='font-semibold text-gray-800 truncate'>{book.title}</h2>
+                    <PiBookOpenTextLight style={{ color: 'var(--oai-green)', fontSize: '1.2rem', flexShrink: 0 }} />
+                    <h2 className='font-medium truncate text-sm' style={{ color: 'var(--oai-text)' }}>
+                      {book.title}
+                    </h2>
                   </div>
-                  <div className='flex items-center gap-2 mb-2'>
-                    <BiUserCircle className='text-red-300 text-xl flex-shrink-0' />
-                    <span className='text-gray-600 text-sm'>{book.author}</span>
+                  <div className='flex items-center gap-2 mb-3'>
+                    <BiUserCircle style={{ color: 'var(--oai-muted)', fontSize: '1.1rem', flexShrink: 0 }} />
+                    <span className='text-sm truncate' style={{ color: 'var(--oai-muted)' }}>
+                      {book.author}
+                    </span>
                   </div>
                   {book.genre && (
-                    <span className='text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full'>
-                      {book.genre}
-                    </span>
+                    <span className='badge-blue mb-3 inline-block'>{book.genre}</span>
                   )}
-                  <div className='flex justify-between items-center mt-3'>
-                    <span className='font-bold text-gray-800'>
+                  <div
+                    className='flex justify-between items-center mt-3 pt-3'
+                    style={{ borderTop: '1px solid var(--oai-border)' }}
+                  >
+                    <span className='font-semibold text-sm' style={{ color: 'var(--oai-text)' }}>
                       ${parseFloat(book.price || 0).toFixed(2)}
                     </span>
                     {book.stock > 0 ? (
-                      <span className='text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full'>
-                        {book.stock} in stock
-                      </span>
+                      <span className='badge-green'>{book.stock} in stock</span>
                     ) : (
-                      <span className='text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full'>
-                        Out of stock
-                      </span>
+                      <span className='badge-red'>Out of stock</span>
                     )}
                   </div>
-                  <div className='flex justify-end gap-3 mt-3 pt-3 border-t border-gray-100'>
+                  <div
+                    className='flex justify-end gap-3 mt-3 pt-3'
+                    style={{ borderTop: '1px solid var(--oai-border)' }}
+                  >
                     <Link to={`/books/details/${book.id || book._id}`}>
-                      <BsInfoCircle className='text-xl text-green-700 hover:text-black' />
+                      <BsInfoCircle
+                        className='text-xl transition-colors'
+                        style={{ color: 'var(--oai-green)' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--oai-text)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-green)')}
+                      />
                     </Link>
                     {isAdmin && (
                       <>
                         <Link to={`/books/edit/${book.id || book._id}`}>
-                          <AiOutlineEdit className='text-xl text-yellow-600 hover:text-black' />
+                          <AiOutlineEdit
+                            className='text-xl transition-colors'
+                            style={{ color: 'var(--oai-muted)' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--oai-text)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
+                          />
                         </Link>
                         <Link to={`/books/delete/${book.id || book._id}`}>
-                          <MdOutlineDelete className='text-xl text-red-600 hover:text-black' />
+                          <MdOutlineDelete
+                            className='text-xl transition-colors'
+                            style={{ color: 'var(--oai-red)' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
+                            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                          />
                         </Link>
                       </>
                     )}

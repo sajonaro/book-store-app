@@ -2,8 +2,14 @@ import React from 'react';
 
 const Spinner = () => {
   return (
-    <div className='flex justify-center items-center py-8'>
-      <div className='w-12 h-12 border-4 border-gray-200 border-t-sky-500 rounded-full animate-spin' />
+    <div className='flex justify-center items-center py-10'>
+      <div
+        className='w-10 h-10 rounded-full animate-spin'
+        style={{
+          border: '2px solid var(--oai-border)',
+          borderTopColor: 'var(--oai-green)',
+        }}
+      />
     </div>
   );
 };

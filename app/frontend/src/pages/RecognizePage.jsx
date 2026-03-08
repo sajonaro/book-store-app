@@ -18,9 +18,6 @@ import { useNavigate } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 import Spinner from '../components/Spinner';
 
-const inputCls =
-  'w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-400 text-sm';
-
 const FIELDS = [
   { key: 'title',       label: 'Title' },
   { key: 'author',      label: 'Author' },
@@ -33,9 +30,9 @@ const FIELDS = [
 ];
 
 const SOURCE_BADGE = {
-  openlibrary: { label: 'OpenLibrary',   cls: 'bg-green-100 text-green-700' },
-  gpt4o:       { label: 'GPT-4o Vision', cls: 'bg-sky-100 text-sky-700' },
-  merged:      { label: 'Merged',        cls: 'bg-purple-100 text-purple-700' },
+  openlibrary: { label: 'OpenLibrary',   cls: 'badge-green' },
+  gpt4o:       { label: 'GPT-4o Vision', cls: 'badge-blue' },
+  merged:      { label: 'Merged',        cls: 'badge-purple' },
 };
 
 // ── Drop-zone ─────────────────────────────────────────────────────────────────
@@ -61,8 +58,17 @@ const DropZone = ({ files, onChange }) => {
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center transition
-          ${dragging ? 'border-sky-400 bg-sky-50' : 'border-gray-300 hover:border-sky-400 hover:bg-gray-50'}`}
+        className='cursor-pointer rounded-xl p-10 text-center transition-all'
+        style={{
+          border: `2px dashed ${dragging ? 'var(--oai-green)' : 'var(--oai-border-2)'}`,
+          backgroundColor: dragging ? 'rgba(16,163,127,0.05)' : 'transparent',
+        }}
+        onMouseEnter={(e) => {
+          if (!dragging) e.currentTarget.style.borderColor = 'var(--oai-muted)';
+        }}
+        onMouseLeave={(e) => {
+          if (!dragging) e.currentTarget.style.borderColor = 'var(--oai-border-2)';
+        }}
       >
         <input
           ref={inputRef}
@@ -73,10 +79,10 @@ const DropZone = ({ files, onChange }) => {
           onChange={(e) => onChange(Array.from(e.target.files))}
         />
         <p className='text-4xl mb-3'>📷</p>
-        <p className='text-gray-600 font-medium'>
+        <p className='text-sm font-medium' style={{ color: 'var(--oai-text)' }}>
           Drag & drop book photos here, or click to browse
         </p>
-        <p className='text-sm text-gray-400 mt-1'>
+        <p className='text-xs mt-1' style={{ color: 'var(--oai-subtle)' }}>
           Upload multiple photos of the same book — cover, spine, title page, back cover
         </p>
       </div>
@@ -89,13 +95,26 @@ const DropZone = ({ files, onChange }) => {
               key={i}
               src={src}
               alt={`preview ${i + 1}`}
-              className='h-28 w-28 object-cover rounded-xl border border-gray-200 shadow-sm'
+              className='h-28 w-28 object-cover rounded-lg'
+              style={{ border: '1px solid var(--oai-border)' }}
             />
           ))}
           <button
             type='button'
             onClick={(e) => { e.stopPropagation(); onChange([]); }}
-            className='h-28 w-28 flex items-center justify-center rounded-xl border border-dashed border-gray-300 text-gray-400 hover:border-red-400 hover:text-red-400 transition text-xs'
+            className='h-28 w-28 flex items-center justify-center rounded-lg text-xs transition-colors'
+            style={{
+              border: '1px dashed var(--oai-border-2)',
+              color: 'var(--oai-subtle)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--oai-red)';
+              e.currentTarget.style.color = 'var(--oai-red)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--oai-border-2)';
+              e.currentTarget.style.color = 'var(--oai-subtle)';
+            }}
           >
             ✕ Clear
           </button>
@@ -108,7 +127,7 @@ const DropZone = ({ files, onChange }) => {
 // ── Review Panel ──────────────────────────────────────────────────────────────
 const ReviewPanel = ({ result, coverThumb, source, onAccept, onReject }) => {
   const [edited, setEdited] = useState({ ...result });
-  const badge = SOURCE_BADGE[source] ?? { label: source ?? 'AI', cls: 'bg-gray-100 text-gray-600' };
+  const badge = SOURCE_BADGE[source] ?? { label: source ?? 'AI', cls: 'badge-gray' };
 
   const filledCount = FIELDS.filter(({ key }) => {
     const v = edited[key];
@@ -116,30 +135,42 @@ const ReviewPanel = ({ result, coverThumb, source, onAccept, onReject }) => {
   }).length;
 
   return (
-    <div className='bg-white rounded-2xl shadow-sm border border-amber-300 p-6 mt-6'>
+    <div
+      className='rounded-xl p-6 mt-6 animate-fade-in'
+      style={{
+        backgroundColor: 'var(--oai-surface)',
+        border: '1px solid var(--oai-border-2)',
+      }}
+    >
       {/* Header */}
       <div className='flex items-center justify-between mb-1'>
-        <h2 className='text-lg font-semibold text-gray-800'>🔍 Review Scan Results</h2>
-        <span className={`text-xs font-medium px-2 py-1 rounded-full ${badge.cls}`}>
-          {badge.label}
-        </span>
+        <h2 className='text-base font-semibold' style={{ color: 'var(--oai-text)' }}>
+          🔍 Review Scan Results
+        </h2>
+        <span className={badge.cls}>{badge.label}</span>
       </div>
-      <p className='text-sm text-gray-400 mb-4'>
+      <p className='text-sm mb-4' style={{ color: 'var(--oai-muted)' }}>
         {filledCount}/{FIELDS.length} fields detected &mdash; edit any value before accepting.
       </p>
 
       {/* Cover thumbnail from AI */}
       {coverThumb && (
-        <div className='flex items-start gap-4 mb-5 p-3 bg-gray-50 rounded-xl'>
+        <div
+          className='flex items-start gap-4 mb-5 p-3 rounded-lg'
+          style={{ backgroundColor: 'var(--oai-surface-2)' }}
+        >
           <div className='flex-shrink-0'>
-            <p className='text-xs text-gray-500 mb-1 font-medium'>Detected Cover</p>
+            <p className='text-xs font-medium mb-1' style={{ color: 'var(--oai-muted)' }}>
+              Detected Cover
+            </p>
             <img
               src={coverThumb}
               alt='Scanned book cover'
-              className='w-20 h-28 object-cover rounded-lg border border-gray-200 shadow-sm'
+              className='w-20 h-28 object-cover rounded-lg'
+              style={{ border: '1px solid var(--oai-border)' }}
             />
           </div>
-          <p className='text-sm text-gray-500 mt-5 leading-relaxed'>
+          <p className='text-sm mt-5 leading-relaxed' style={{ color: 'var(--oai-muted)' }}>
             This thumbnail was automatically captured from your first uploaded photo and will be
             stored as the book's cover image when you accept.
           </p>
@@ -154,20 +185,24 @@ const ReviewPanel = ({ result, coverThumb, source, onAccept, onReject }) => {
           return (
             <div key={key} className='flex items-start gap-3'>
               <span
-                className={`mt-[9px] w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold
-                  ${empty ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-600'}`}
+                className='mt-[9px] w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold'
+                style={{
+                  backgroundColor: empty ? 'rgba(239,68,68,0.15)' : 'rgba(16,163,127,0.15)',
+                  color: empty ? 'var(--oai-red)' : 'var(--oai-green)',
+                }}
               >
                 {empty ? '✗' : '✓'}
               </span>
               <div className='flex-1'>
-                <label className='block text-xs font-medium text-gray-500 mb-0.5'>{label}</label>
+                <label className='oai-label'>{label}</label>
                 {multiline ? (
                   <textarea
                     rows={2}
                     value={val ?? ''}
                     placeholder={`No ${label.toLowerCase()} detected`}
                     onChange={(e) => setEdited((p) => ({ ...p, [key]: e.target.value }))}
-                    className={inputCls}
+                    className='oai-input text-sm'
+                    style={{ resize: 'vertical' }}
                   />
                 ) : (
                   <input
@@ -185,7 +220,7 @@ const ReviewPanel = ({ result, coverThumb, source, onAccept, onReject }) => {
                             : e.target.value,
                       }))
                     }
-                    className={inputCls}
+                    className='oai-input text-sm'
                   />
                 )}
               </div>
@@ -198,13 +233,13 @@ const ReviewPanel = ({ result, coverThumb, source, onAccept, onReject }) => {
       <div className='flex gap-3 mt-5'>
         <button
           onClick={() => onAccept(edited, coverThumb)}
-          className='flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold px-5 py-2.5 rounded-lg transition'
+          className='btn-primary flex-1'
         >
           ✓ Accept & Create Book
         </button>
         <button
           onClick={onReject}
-          className='flex-1 bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-5 py-2.5 rounded-lg transition'
+          className='btn-danger flex-1'
         >
           ✗ Reject & Retry
         </button>
@@ -253,7 +288,6 @@ const RecognizePage = () => {
   };
 
   const handleAccept = (edited, coverThumb) => {
-    // Pass the pre-filled data AND cover thumbnail to CreateBooks via router state
     navigate('/books/create', {
       state: { prefill: edited, cover_thumbnail: coverThumb },
     });
@@ -270,32 +304,42 @@ const RecognizePage = () => {
   };
 
   return (
-    <div className='min-h-screen bg-gray-50 p-6'>
-      <BackButton />
-      <div className='max-w-2xl mx-auto'>
-        <h1 className='text-3xl font-bold text-gray-900 my-6'>📷 Scan a Book</h1>
-        <p className='text-gray-500 mb-6'>
-          Upload one or more photos of the same book (cover, spine, back cover, title page). The AI
-          will extract the metadata and let you review it before creating the book record.
+    <div className='min-h-screen' style={{ backgroundColor: 'var(--oai-bg)' }}>
+      <div className='max-w-2xl mx-auto px-6 py-8'>
+        <BackButton />
+        <h1 className='text-2xl font-semibold mt-6 mb-2' style={{ color: 'var(--oai-text)' }}>
+          📷 Scan a Book
+        </h1>
+        <p className='text-sm mb-6' style={{ color: 'var(--oai-muted)' }}>
+          Upload one or more photos of the same book. AI will extract the metadata and let you
+          review it before creating the book record.
         </p>
 
         {scanning && <Spinner />}
 
         {/* Upload zone */}
-        <div className='bg-white rounded-2xl shadow-sm border border-gray-200 p-6'>
+        <div
+          className='rounded-xl p-6'
+          style={{
+            backgroundColor: 'var(--oai-surface)',
+            border: '1px solid var(--oai-border)',
+          }}
+        >
           <DropZone files={files} onChange={setFiles} />
 
           <div className='flex gap-3 mt-5'>
             <button
               onClick={handleScan}
               disabled={scanning || files.length === 0}
-              className='flex-1 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-50'
+              className='btn-primary flex-1'
             >
-              {scanning ? 'Scanning…' : `🤖 Scan ${files.length > 0 ? `(${files.length} photo${files.length > 1 ? 's' : ''})` : ''}`}
+              {scanning
+                ? 'Scanning…'
+                : `🤖 Scan${files.length > 0 ? ` (${files.length} photo${files.length > 1 ? 's' : ''})` : ''}`}
             </button>
             <button
               onClick={() => navigate('/books/create')}
-              className='px-6 py-2.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition text-sm font-medium'
+              className='btn-secondary'
             >
               Enter manually
             </button>

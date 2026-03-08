@@ -6,9 +6,12 @@ const BackButton = ({ destination = '/home' }) => {
   return (
     <Link
       to={destination}
-      className='inline-flex items-center gap-2 text-sky-600 hover:text-sky-800 font-medium transition'
+      className='inline-flex items-center gap-2 text-sm font-medium transition-colors'
+      style={{ color: 'var(--oai-muted)' }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--oai-text)')}
+      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
     >
-      <BsArrowLeft className='text-xl' />
+      <BsArrowLeft className='text-base' />
       <span>Back</span>
     </Link>
   );
