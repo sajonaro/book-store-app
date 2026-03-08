@@ -250,7 +250,7 @@ frontend    → Nginx :${FRONTEND_PORT:-8080}→:80 (frontend_net)
 
 ---
 
-### T9: Integration Test
+### ~~T9: Integration Test~~ *(pending — no test file yet)*
 
 **What:** End-to-end smoke test covering the full happy path: create via AI recognition → search → retrieve → update stock → delete.
 
@@ -422,6 +422,201 @@ CREATE TABLE IF NOT EXISTS users (
 
 ---
 
+---
+
+### T13: SaaS Multi-Tenancy
+
+**What:** Transform the app into a multi-tenant SaaS platform where each tenant (book store) operates in complete isolation — its own database, its own admin user, its own branding, and its own buyer-facing QR/barcode URL.
+
+**Motivation:** Multiple independent book stores should be able to use the same hosted instance of the software without any data bleed between tenants.
+
+---
+
+#### T13.1 — Tenant Registration (Admin Self-Sign-Up)
+
+**What:** Add a public tenant registration page (`/register`) where a new book store owner can create an account. On successful registration a new tenant record is created and the registrant becomes the first admin of that tenant.
+
+**Backend:**
+
+Add a `tenants` table to the shared (control-plane) PostgreSQL database:
+
+```sql
+CREATE TABLE IF NOT EXISTS tenants (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug            VARCHAR(100) NOT NULL UNIQUE,   -- URL-safe identifier, e.g. "greenleaf-books"
+    name            VARCHAR(255) NOT NULL,
+    logo_url        TEXT,                            -- path or URL to uploaded logo
+    db_name         VARCHAR(100) NOT NULL UNIQUE,   -- isolated database name for this tenant
+    openai_key_enc  TEXT         NOT NULL,           -- AES-256 encrypted OpenAI API key
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+```
+
+Extend the `users` table with a `tenant_id` foreign key:
+
+```sql
+ALTER TABLE users ADD COLUMN tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;
+```
+
+New endpoint — `POST /tenants/register`:
+- Request body: `{ tenantName, slug, adminName, adminEmail, adminPassword, openaiApiKey }`
+- Validates `slug` is URL-safe and unique
+- Validates `openaiApiKey` is non-empty and matches the `sk-` prefix pattern
+- Stores `openaiApiKey` encrypted at rest in the `tenants` table (AES-256; encryption key from `TENANT_SECRET` env var)
+- Provisions a new PostgreSQL database for the tenant (see T13.3)
+- Creates a tenant row
+- Creates an admin user (bcrypt, cost 12) linked to the new tenant
+- Returns `201 { tenant: { id, slug, name }, token }` (JWT or signed token for auto-login)
+- Rate-limited to **5 requests / hour per IP**
+
+**Frontend:**
+
+- New page: `src/pages/RegisterPage.jsx`
+- Route `/register` — publicly accessible
+- Registration form fields:
+  - Store name (maps to `tenantName`)
+  - URL slug (auto-suggested from store name, editable; validated to `[a-z0-9-]+`)
+  - Admin full name
+  - Admin email
+  - Admin password + confirm password
+  - OpenAI API key (masked input; tooltip explains it is used for AI book recognition and stored encrypted)
+- On success: auto-login and redirect to `/home`
+- On slug conflict: inline error "That store URL is already taken"
+
+**Files:**
+- `app/backend/models/tenantModel.js` *(new)*
+- `app/backend/routes/tenantRoute.js` *(new)*
+- `app/backend/src/crypto.js` *(new)* — `encryptKey(plaintext)`, `decryptKey(ciphertext)` using Node.js `crypto` AES-256-GCM
+- `app/backend/index.js` (mount `/tenants` router)
+- `app/frontend/src/pages/RegisterPage.jsx` *(new)*
+- `app/frontend/src/App.jsx` (add `/register` route)
+- `app/.env.example` (add `TENANT_SECRET` — 32-byte hex key for AES-256 encryption)
+
+**Verify:**
+- `POST /tenants/register` with valid body creates a tenant and admin user; returns `201`
+- `POST /tenants/register` without `openaiApiKey` returns `400 { msg: "OpenAI API key is required" }`
+- The stored `openai_key_enc` column contains ciphertext (not the raw key)
+- The `ai-api` sidecar uses the decrypted per-tenant key when processing recognition requests for that tenant (passed via an internal header `X-OpenAI-Key`)
+- Submitting the same `slug` twice returns `409 { msg: "Slug already taken" }`
+- Visiting `/register`, filling the form, and submitting redirects the user to `/home`
+- Exceeding 5 registrations/hour from the same IP returns `429`
+
+---
+
+#### T13.2 — Per-Tenant Logo Upload
+
+**What:** Allow the tenant admin to upload a custom logo for their store. The logo is displayed on the Search page (buyer-facing) and the Login page in place of the generic app name.
+
+**Backend:**
+
+New endpoint — `POST /tenants/:tenantId/logo`:
+- Accepts `multipart/form-data`, field name `logo`
+- Validates: image only (PNG/JPEG/WebP/SVG), max 2 MB
+- Stores the file on disk under `uploads/logos/<tenantId>.<ext>` (or in object storage — S3/GCS in production)
+- Updates `tenants.logo_url` in the database
+- Returns `200 { logoUrl }`
+
+New endpoint — `GET /tenants/:tenantId/logo`:
+- Returns the logo file (or redirects to the object storage URL)
+
+**Frontend:**
+
+- Add a **"Store Settings"** section to the Admin home page (`Home.jsx`) or a new `Settings.jsx` page
+- Logo upload widget: drag-and-drop or file picker; shows current logo preview
+- After upload, the new logo is reflected immediately in the header / search page branding
+
+**Files:**
+- `app/backend/routes/tenantRoute.js` (add logo endpoints)
+- `app/backend/index.js` (serve `uploads/logos/` as static)
+- `app/frontend/src/pages/Settings.jsx` *(new)*
+- `app/frontend/src/App.jsx` (add `/settings` route, admin-only)
+- `app/frontend/src/components/TenantLogo.jsx` *(new — displays logo or fallback app name)*
+
+**Verify:**
+- Admin uploads a PNG logo → `GET /tenants/:id/logo` returns the image
+- Logo appears on the Search page header after upload
+- Uploading a file > 2 MB returns `400 { msg: "File too large" }`
+- Non-admin users cannot call `POST /tenants/:id/logo` (returns `403`)
+
+---
+
+#### T13.3 — Isolated Tenant Database
+
+**What:** Each tenant's book catalog (books, users) lives in its own PostgreSQL database, completely isolated from other tenants. The backend selects the correct connection pool based on the tenant derived from the request.
+
+**Design:**
+
+- A **control-plane** database (`bookstore_control`) holds the `tenants` table and global admin records.
+- Each tenant gets a dedicated database named after their `db_name` field (e.g., `tenant_greenleaf`).
+- On tenant registration (`T13.1`), the backend:
+  1. Connects to PostgreSQL as a superuser
+  2. Runs `CREATE DATABASE <db_name>`
+  3. Runs the `books` and `users` DDL in the new database
+  4. Seeds the first admin user
+- The backend maintains a **connection pool map** (`Map<tenantId, pg.Pool>`) initialized lazily on first request.
+- Tenant resolution: extract the tenant slug from the `Host` header subdomain (`greenleaf-books.example.com`) **or** from a `X-Tenant-ID` request header (for local/dev environments).
+
+**Files:**
+- `app/backend/src/tenantDb.js` *(new)* — `getPool(tenantId)`, `provisionTenantDb(tenantSlug, dbName)`
+- `app/backend/middleware/resolveTenant.js` *(new)* — middleware that resolves tenant from Host/header and attaches `req.tenantPool` + `req.tenant`
+- `app/backend/index.js` (apply `resolveTenant` middleware globally; use `req.tenantPool` in all model queries)
+- `app/backend/models/bookModel.js` (accept pool as parameter instead of module-level singleton)
+- `app/backend/models/userModel.js` (accept pool as parameter)
+- `app/docker-compose.yml` (add `POSTGRES_SUPERUSER` + `POSTGRES_SUPERUSER_PASSWORD` env vars for provisioning)
+- `app/.env.example` (document new env vars)
+
+**Verify:**
+- Two tenants registered; books created under Tenant A do **not** appear in Tenant B's catalog
+- Deleting Tenant A's database does not affect Tenant B
+- `resolveTenant` middleware returns `400` if the tenant slug cannot be resolved
+- Lazy pool initialization does not cause race conditions under concurrent requests
+
+---
+
+#### T13.4 — Tenant-Specific Buyer URL & Barcode Generation
+
+**What:** Each tenant can generate a QR code (or barcode) that encodes a deep-link URL specific to that tenant's buyer-facing catalog. Scanning the code on a mobile device opens the tenant's search page directly.
+
+**URL format:**
+
+```
+https://<slug>.example.com/search
+```
+or, for single-domain deployments:
+```
+https://example.com/t/<slug>/search
+```
+
+**Backend:**
+
+New endpoint — `GET /tenants/:tenantId/invite-qr`:
+- Generates a QR code image (PNG) encoding the tenant's buyer URL
+- Uses the `qrcode` npm package (pure JS, no native deps)
+- Returns `Content-Type: image/png` (or `200 { qrDataUrl }` for base64 embed)
+- Admin-only (requires valid session token for the tenant)
+
+**Frontend:**
+
+- Add a **"Buyer Invite"** card to the Admin home page or Settings page
+- Displays the tenant's buyer URL as a copyable link
+- Shows the generated QR code image inline
+- "Download QR" button triggers browser download of the PNG
+- "Regenerate" button re-fetches the QR code (URL is stable — same slug = same URL)
+
+**Files:**
+- `app/backend/routes/tenantRoute.js` (add `GET /tenants/:tenantId/invite-qr`)
+- `app/backend/package.json` (add `qrcode` dependency)
+- `app/frontend/src/pages/Settings.jsx` (add Buyer Invite section)
+- `app/frontend/src/components/QRCodeCard.jsx` *(new)*
+
+**Verify:**
+- `GET /tenants/:id/invite-qr` returns a valid PNG image
+- Scanning the QR code with a phone opens the correct tenant's search page
+- Unauthenticated requests to `/tenants/:id/invite-qr` return `401`
+- Two different tenants generate different QR codes encoding their respective URLs
+
+---
+
 ## Validation
 
 - `docker compose up` starts all services cleanly with no manual steps
@@ -431,3 +626,6 @@ CREATE TABLE IF NOT EXISTS users (
 - All new fields (isbn, publisher, genre, description, price, stock) persisted to PostgreSQL and returned in API responses
 - Login page is the entry point; role selection determines the destination (Home vs Search)
 - Admin session persisted in `localStorage`; protected routes redirect to `/login` when session is absent
+- **[T13]** Two independently registered tenants operate with fully isolated databases; no data cross-contamination
+- **[T13]** Each tenant's admin can upload a custom logo visible to buyers on the search page
+- **[T13]** Each tenant can download a QR code that deep-links buyers directly to their catalog

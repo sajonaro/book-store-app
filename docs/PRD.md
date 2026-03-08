@@ -23,6 +23,10 @@ We are building a **book store inventory and catalog system** that allows admins
 | FR009  | Retail buyer can view a book detail page showing all metadata (title, author, description, price, stock availability).                                        | Retail Buyer   | Book detail page renders all stored fields; out-of-stock books are labeled accordingly.                         |
 | FR010  | The catalog is accessible via a web browser (responsive design).                                                                                              | Retail Buyer   | Site is usable on desktop and mobile browsers without a native app install.                                     |
 | FR011  | The catalog is accessible via a native Android and iOS app (Phase 2).                                                                                         | Retail Buyer   | App connects to the same backend API; search and browse work on device (deferred to Phase 2).                  |
+| FR012  | A new book store owner can self-register as a tenant admin via a public registration page, providing their own OpenAI API key during registration.            | Tenant Admin   | Submitting the registration form (including a valid OpenAI API key) creates an isolated tenant account; the key is stored encrypted and used exclusively for that tenant's AI recognition requests. Admin is logged in automatically. |
+| FR013  | Each tenant admin can upload a custom logo for their store.                                                                                                   | Tenant Admin   | Uploading a logo updates the store's branding on the buyer-facing search page and login page immediately.       |
+| FR014  | Each tenant's book catalog and user data are fully isolated from other tenants.                                                                               | System         | Books and users created under Tenant A are never visible to Tenant B, and vice versa.                          |
+| FR015  | Each tenant admin can generate a QR code that encodes a deep-link URL to their store's buyer catalog.                                                         | Tenant Admin   | The generated QR code, when scanned, opens the correct tenant's search page; admins can download the PNG.      |
 
 ---
 
@@ -34,3 +38,5 @@ We are building a **book store inventory and catalog system** that allows admins
 - Stock and price updates made by an admin are visible to buyers **within 5 seconds**.
 - The system handles books from any era (pre-ISBN vintage prints through modern releases) without failing the metadata extraction step.
 - All core services (backend API, PostgreSQL, Elasticsearch) start cleanly with a single `docker compose up` command.
+- A new book store owner can register, upload a logo, and share a buyer QR code in **under 5 minutes** with no technical assistance.
+- Two independently registered tenants see completely separate book catalogs with zero data cross-contamination.
