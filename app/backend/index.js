@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { initDB } from './models/bookModel.js';
 import { UserModel } from './models/userModel.js';
 import { initIndex } from './services/searchService.js';
 import authRoute from './routes/authRoute.js';
@@ -70,15 +69,16 @@ app.use((err, _req, res, _next) => {
     res.status(statusCode).json({ msg: message });
 });
 
-// Initialize DB, then Elasticsearch (best-effort), then start server
+// Seed default data, then Elasticsearch (best-effort), then start server.
+// Schema is created by app/db/initialize-schema.sql via PostgreSQL's
+// docker-entrypoint-initdb.d mechanism — no runtime DDL needed here.
 async function start() {
     try {
-    await initDB();
-    await UserModel.initUsers();
-  } catch (err) {
-    console.error('FATAL: Failed to initialize database:', err.message);
-    process.exit(1);
-  }
+        await UserModel.seedDefaultAdmin();
+    } catch (err) {
+        console.error('FATAL: Failed to seed default admin:', err.message);
+        process.exit(1);
+    }
 
     // Elasticsearch init is best-effort — don't block startup
     initIndex().catch((err) => {

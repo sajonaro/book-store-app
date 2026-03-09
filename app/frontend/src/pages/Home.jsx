@@ -50,12 +50,6 @@ const Home = () => {
           </h1>
           <div className='flex items-center gap-3'>
             <Link
-              to='/books/recognize'
-              className='btn-secondary text-xs px-3 py-1.5'
-            >
-              📷 Scan
-            </Link>
-            <Link
               to='/books/create'
               className='btn-primary text-xs px-3 py-1.5'
             >

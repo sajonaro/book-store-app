@@ -58,6 +58,32 @@ router.post('/recognize', recognizeLimiter, upload.array('photos', 10), async (r
         }
 
         const aiData = await aiRes.json();
+
+        // --- Duplicate detection -------------------------------------------
+        // After getting AI metadata, check if this book already exists in the
+        // DB. Identity priority: ISBN → title+author hash (via DB function).
+        const meta = aiData?.data ?? {};
+        const existing = await BookModel.findByIdentity({
+            isbn:   meta.isbn   || null,
+            title:  meta.title  || null,
+            author: meta.author || null,
+        });
+
+        if (existing) {
+            // Book already in catalogue → increment stock.
+            // Also patch any fields that were missing before (e.g. isbn found
+            // this time via OCR but was absent when the book was first added).
+            const updated = await BookModel.incrementStockAndPatch(existing.id, {
+                isbn: meta.isbn || null,
+            });
+            return res.status(200).json({
+                ...aiData,
+                duplicate: true,
+                existing_book: updated,
+            });
+        }
+        // ------------------------------------------------------------------
+
         return res.status(200).json(aiData);
     } catch (error) {
         console.error('recognize error:', error.message);

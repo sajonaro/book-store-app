@@ -11,19 +11,10 @@ const pool = new Pool({
   port: 5432,
 });
 
-async function initUsers() {
-  // Create users table
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      name       VARCHAR(255) NOT NULL,
-      email      VARCHAR(255) NOT NULL UNIQUE,
-      pwd_hash   TEXT         NOT NULL,
-      created_at TIMESTAMPTZ  NOT NULL DEFAULT now()
-    );
-  `);
-
-  // Seed default admin if not present
+// Seed default admin user if not already present.
+// The users table is created by app/db/initialize-schema.sql via
+// PostgreSQL's docker-entrypoint-initdb.d mechanism.
+async function seedDefaultAdmin() {
   const existing = await pool.query(
     'SELECT id FROM users WHERE email = $1',
     ['admin@bookstore.com'],
@@ -48,4 +39,4 @@ async function findByEmail(email) {
   return result.rows[0] || null;
 }
 
-export const UserModel = { initUsers, findByEmail };
+export const UserModel = { seedDefaultAdmin, findByEmail };

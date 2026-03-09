@@ -5,6 +5,7 @@ services:
     env_file: .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/initialize-schema.sql:/docker-entrypoint-initdb.d/initialize-schema.sql:ro
     networks:
       - backend_net
     # Do NOT expose port 5432 to the host in production

@@ -36,34 +36,6 @@ function normalizeBook(row) {
     };
 }
 
-// Create the books table if it doesn't exist, then add new columns if missing
-export async function initDB() {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS books (
-            id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            title        VARCHAR(500)   NOT NULL,
-            author       VARCHAR(500)   NOT NULL,
-            isbn         VARCHAR(20),
-            publisher    VARCHAR(255),
-            publish_year INTEGER,
-            genre        VARCHAR(100),
-            description  TEXT,
-            price        NUMERIC(10,2)  NOT NULL DEFAULT 0.00,
-            stock        INTEGER        NOT NULL DEFAULT 0,
-            created_at   TIMESTAMPTZ    NOT NULL DEFAULT now(),
-            updated_at   TIMESTAMPTZ    NOT NULL DEFAULT now()
-        );
-    `);
-
-    // Add new columns to existing tables (idempotent — safe to run every boot)
-    await pool.query(`ALTER TABLE books ADD COLUMN IF NOT EXISTS language         VARCHAR(100)`);
-    await pool.query(`ALTER TABLE books ADD COLUMN IF NOT EXISTS shelf_name       VARCHAR(100)`);
-    await pool.query(`ALTER TABLE books ADD COLUMN IF NOT EXISTS shelf_number     VARCHAR(50)`);
-    await pool.query(`ALTER TABLE books ADD COLUMN IF NOT EXISTS cover_thumbnail  BYTEA`);
-
-    console.log('Database initialized: books table ready');
-}
-
 // Query helpers
 export const BookModel = {
     async findAll() {
@@ -81,6 +53,60 @@ export const BookModel = {
         return normalizeBook(result.rows[0]) || null;
     },
 
+    /**
+     * Find a book by identity:
+     *   - If isbn is provided, look up by ISBN first.
+     *   - Otherwise, call book_identity_hash(title, author) in the DB and
+     *     look up by title_author_hash.
+     * Returns the book row (normalized) or null if not found.
+     */
+    async findByIdentity({ isbn, title, author }) {
+        if (isbn) {
+            const result = await pool.query(
+                'SELECT * FROM books WHERE isbn = $1',
+                [isbn]
+            );
+            if (result.rows[0]) return normalizeBook(result.rows[0]);
+        }
+
+        // Fallback: delegate hash computation to the DB function.
+        // $1 and $2 are used ONLY as function args here — no type conflict.
+        if (title && author) {
+            const result = await pool.query(
+                `SELECT * FROM books
+                 WHERE title_author_hash = book_identity_hash($1, $2)`,
+                [title, author]
+            );
+            if (result.rows[0]) return normalizeBook(result.rows[0]);
+        }
+
+        return null;
+    },
+
+    /**
+     * Increment stock by 1 and optionally patch missing fields (e.g. isbn).
+     * Only patches a field when the existing value is NULL and a new value is provided.
+     * Returns the updated book.
+     */
+    async incrementStockAndPatch(id, patch = {}) {
+        // Build SET clauses for fields that are currently NULL on the row
+        // and have a non-null value in the patch. Supported: isbn.
+        const setClauses = ['stock = stock + 1', 'updated_at = now()'];
+        const params = [id];
+
+        if (patch.isbn) {
+            // Only update isbn if it's currently NULL on this row
+            setClauses.push(`isbn = CASE WHEN isbn IS NULL THEN $${params.length + 1} ELSE isbn END`);
+            params.push(patch.isbn);
+        }
+
+        const result = await pool.query(
+            `UPDATE books SET ${setClauses.join(', ')} WHERE id = $1 RETURNING *`,
+            params
+        );
+        return normalizeBook(result.rows[0]) || null;
+    },
+
     async create(fields) {
         const {
             title, author, isbn, publisher, publish_year,
@@ -90,11 +116,17 @@ export const BookModel = {
 
         const thumbBuf = dataUriToBuffer(cover_thumbnail);
 
+        // title_author_hash is computed in the DB via book_identity_hash().
+        // To avoid "inconsistent types deduced for parameter $N" we pass title
+        // and author as dedicated extra parameters ($14, $15) for the function
+        // call instead of reusing $1/$2 (which PG already bound to VARCHAR).
         const result = await pool.query(
             `INSERT INTO books
                 (title, author, isbn, publisher, publish_year, genre, description,
-                 price, stock, language, shelf_name, shelf_number, cover_thumbnail)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                 price, stock, language, shelf_name, shelf_number, cover_thumbnail,
+                 title_author_hash)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                     book_identity_hash($14, $15))
              RETURNING *`,
             [
                 title, author,
@@ -103,6 +135,8 @@ export const BookModel = {
                 price ?? 0.00, stock ?? 0,
                 language ?? null, shelf_name ?? null, shelf_number ?? null,
                 thumbBuf ?? null,
+                // Extra params for book_identity_hash — same values, no type conflict
+                title, author,
             ]
         );
         return normalizeBook(result.rows[0]);
@@ -115,7 +149,8 @@ export const BookModel = {
             language, shelf_name, shelf_number, cover_thumbnail,
         } = fields;
 
-        // Only update cover_thumbnail if a new value is provided; otherwise keep existing
+        // title and author appear twice: once as column values ($1, $2) and
+        // once as book_identity_hash arguments ($13, $14) to avoid type conflicts.
         let thumbClause = '';
         const params = [
             title, author,
@@ -123,35 +158,38 @@ export const BookModel = {
             genre ?? null, description ?? null,
             price ?? 0.00, stock ?? 0,
             language ?? null, shelf_name ?? null, shelf_number ?? null,
+            // $13 = title (for hash), $14 = author (for hash)
+            title, author,
         ];
 
         if (cover_thumbnail !== undefined) {
             const thumbBuf = dataUriToBuffer(cover_thumbnail);
-            thumbClause = ', cover_thumbnail = $13';
-            params.push(thumbBuf ?? null);
-            params.push(id); // $14
+            thumbClause = ', cover_thumbnail = $15';
+            params.push(thumbBuf ?? null); // $15
+            params.push(id);              // $16
         } else {
-            params.push(id); // $13
+            params.push(id); // $15
         }
 
-        const idParam = cover_thumbnail !== undefined ? '$14' : '$13';
+        const idParam = cover_thumbnail !== undefined ? '$16' : '$15';
 
         const result = await pool.query(
             `UPDATE books SET
-                title        = $1,
-                author       = $2,
-                isbn         = $3,
-                publisher    = $4,
-                publish_year = $5,
-                genre        = $6,
-                description  = $7,
-                price        = $8,
-                stock        = $9,
-                language     = $10,
-                shelf_name   = $11,
-                shelf_number = $12
+                title             = $1,
+                author            = $2,
+                isbn              = $3,
+                publisher         = $4,
+                publish_year      = $5,
+                genre             = $6,
+                description       = $7,
+                price             = $8,
+                stock             = $9,
+                language          = $10,
+                shelf_name        = $11,
+                shelf_number      = $12,
+                title_author_hash = book_identity_hash($13, $14)
                 ${thumbClause},
-                updated_at   = now()
+                updated_at        = now()
              WHERE id = ${idParam}
              RETURNING *`,
             params
