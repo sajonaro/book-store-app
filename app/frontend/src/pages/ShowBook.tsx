@@ -3,11 +3,17 @@ import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 import Spinner from '../components/Spinner';
+import type { Book } from '../types/book';
 
 const PLACEHOLDER =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="280" viewBox="0 0 200 280"><rect width="200" height="280" fill="%231c1c1c"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="60" fill="%23666680">📚</text></svg>';
 
-const InfoRow = ({ label, value }) =>
+interface InfoRowProps {
+  label: string;
+  value?: string | number | null;
+}
+
+const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
   value != null && value !== '' ? (
     <div
       className='flex flex-col sm:flex-row sm:gap-4 py-3'
@@ -22,16 +28,16 @@ const InfoRow = ({ label, value }) =>
     </div>
   ) : null;
 
-const ShowBook = () => {
-  const [book, setBook] = useState({});
+const ShowBook: React.FC = () => {
+  const [book, setBook] = useState<Partial<Book>>({});
   const [loading, setLoading] = useState(false);
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await axios.get(`/books/${id}`);
+        const response = await axios.get<{ data: Book }>(`/books/${id}`);
         setBook(response.data.data);
       } catch (error) {
         console.error(error);
@@ -92,10 +98,10 @@ const ShowBook = () => {
                 </div>
                 <div className='mt-4'>
                   <p className='text-2xl font-semibold' style={{ color: 'var(--oai-green)' }}>
-                    ${parseFloat(book.price || 0).toFixed(2)}
+                    ${parseFloat(String(book.price || 0)).toFixed(2)}
                   </p>
                   <div className='mt-1'>
-                    {book.stock > 0 ? (
+                    {(book.stock ?? 0) > 0 ? (
                       <span className='badge-green'>{book.stock} in stock</span>
                     ) : (
                       <span className='badge-red'>Out of stock</span>

@@ -11,15 +11,57 @@ export const pool = new Pool({
     password: process.env.POSTGRES_PASSWORD,
 });
 
+export interface BookRow {
+    id: string;
+    title: string;
+    author: string;
+    isbn?: string | null;
+    publisher?: string | null;
+    publish_year?: number | null;
+    genre?: string | null;
+    description?: string | null;
+    price: number;
+    stock: number;
+    language?: string | null;
+    shelf_name?: string | null;
+    shelf_number?: string | null;
+    cover_thumbnail?: string | null;
+    title_author_hash?: string;
+    created_at?: Date;
+    updated_at?: Date;
+}
+
+export interface BookIdentity {
+    isbn?: string | null;
+    title?: string | null;
+    author?: string | null;
+}
+
+export interface BookCreateFields {
+    title: string;
+    author: string;
+    isbn?: string | null;
+    publisher?: string | null;
+    publish_year?: number | null;
+    genre?: string | null;
+    description?: string | null;
+    price?: number;
+    stock?: number;
+    language?: string | null;
+    shelf_name?: string | null;
+    shelf_number?: string | null;
+    cover_thumbnail?: string;
+}
+
 /** Convert a pg BYTEA result (Buffer) → base64 data-URI string, or null. */
-function bufferToDataUri(buf) {
+function bufferToDataUri(buf: Buffer | null | undefined): string | null {
     if (!buf) return null;
     if (Buffer.isBuffer(buf)) return `data:image/jpeg;base64,${buf.toString('base64')}`;
     return null;
 }
 
 /** Convert a base64 data-URI string → raw Buffer for BYTEA storage, or null. */
-function dataUriToBuffer(dataUri) {
+function dataUriToBuffer(dataUri: string | null | undefined): Buffer | null {
     if (!dataUri || typeof dataUri !== 'string') return null;
     // Accept "data:image/...;base64,<data>" or plain base64
     const b64 = dataUri.startsWith('data:') ? dataUri.split(',')[1] : dataUri;
@@ -28,24 +70,24 @@ function dataUriToBuffer(dataUri) {
 }
 
 /** Post-process a book row: convert cover_thumbnail BYTEA → data-URI string. */
-function normalizeBook(row) {
+function normalizeBook(row: BookRow | null | undefined): BookRow | null {
     if (!row) return null;
     return {
         ...row,
-        cover_thumbnail: bufferToDataUri(row.cover_thumbnail),
+        cover_thumbnail: bufferToDataUri(row.cover_thumbnail as unknown as Buffer),
     };
 }
 
 // Query helpers
 export const BookModel = {
-    async findAll() {
+    async findAll(): Promise<BookRow[]> {
         const result = await pool.query(
             'SELECT * FROM books ORDER BY created_at DESC'
         );
-        return result.rows.map(normalizeBook);
+        return result.rows.map(normalizeBook).filter(Boolean) as BookRow[];
     },
 
-    async findById(id) {
+    async findById(id: string): Promise<BookRow | null> {
         const result = await pool.query(
             'SELECT * FROM books WHERE id = $1',
             [id]
@@ -60,7 +102,7 @@ export const BookModel = {
      *     look up by title_author_hash.
      * Returns the book row (normalized) or null if not found.
      */
-    async findByIdentity({ isbn, title, author }) {
+    async findByIdentity({ isbn, title, author }: BookIdentity): Promise<BookRow | null> {
         if (isbn) {
             const result = await pool.query(
                 'SELECT * FROM books WHERE isbn = $1',
@@ -70,7 +112,6 @@ export const BookModel = {
         }
 
         // Fallback: delegate hash computation to the DB function.
-        // $1 and $2 are used ONLY as function args here — no type conflict.
         if (title && author) {
             const result = await pool.query(
                 `SELECT * FROM books
@@ -88,14 +129,11 @@ export const BookModel = {
      * Only patches a field when the existing value is NULL and a new value is provided.
      * Returns the updated book.
      */
-    async incrementStockAndPatch(id, patch = {}) {
-        // Build SET clauses for fields that are currently NULL on the row
-        // and have a non-null value in the patch. Supported: isbn.
+    async incrementStockAndPatch(id: string, patch: { isbn?: string | null } = {}): Promise<BookRow | null> {
         const setClauses = ['stock = stock + 1', 'updated_at = now()'];
-        const params = [id];
+        const params: unknown[] = [id];
 
         if (patch.isbn) {
-            // Only update isbn if it's currently NULL on this row
             setClauses.push(`isbn = CASE WHEN isbn IS NULL THEN $${params.length + 1} ELSE isbn END`);
             params.push(patch.isbn);
         }
@@ -107,7 +145,7 @@ export const BookModel = {
         return normalizeBook(result.rows[0]) || null;
     },
 
-    async create(fields) {
+    async create(fields: BookCreateFields): Promise<BookRow> {
         const {
             title, author, isbn, publisher, publish_year,
             genre, description, price, stock,
@@ -116,10 +154,6 @@ export const BookModel = {
 
         const thumbBuf = dataUriToBuffer(cover_thumbnail);
 
-        // title_author_hash is computed in the DB via book_identity_hash().
-        // To avoid "inconsistent types deduced for parameter $N" we pass title
-        // and author as dedicated extra parameters ($14, $15) for the function
-        // call instead of reusing $1/$2 (which PG already bound to VARCHAR).
         const result = await pool.query(
             `INSERT INTO books
                 (title, author, isbn, publisher, publish_year, genre, description,
@@ -139,20 +173,18 @@ export const BookModel = {
                 title, author,
             ]
         );
-        return normalizeBook(result.rows[0]);
+        return normalizeBook(result.rows[0]) as BookRow;
     },
 
-    async update(id, fields) {
+    async update(id: string, fields: BookCreateFields): Promise<BookRow | null> {
         const {
             title, author, isbn, publisher, publish_year,
             genre, description, price, stock,
             language, shelf_name, shelf_number, cover_thumbnail,
         } = fields;
 
-        // title and author appear twice: once as column values ($1, $2) and
-        // once as book_identity_hash arguments ($13, $14) to avoid type conflicts.
         let thumbClause = '';
-        const params = [
+        const params: unknown[] = [
             title, author,
             isbn ?? null, publisher ?? null, publish_year ?? null,
             genre ?? null, description ?? null,
@@ -197,7 +229,7 @@ export const BookModel = {
         return normalizeBook(result.rows[0]) || null;
     },
 
-    async remove(id) {
+    async remove(id: string): Promise<BookRow | null> {
         const result = await pool.query(
             'DELETE FROM books WHERE id = $1 RETURNING *',
             [id]

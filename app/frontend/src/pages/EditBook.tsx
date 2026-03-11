@@ -4,11 +4,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 import Spinner from '../components/Spinner';
+import type { Book } from '../types/book';
 
 const PLACEHOLDER =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160"><rect width="120" height="160" fill="%231c1c1c"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="40" fill="%23666680">📚</text></svg>';
 
-const Field = ({ label, required, children }) => (
+interface FieldProps {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}
+
+const Field: React.FC<FieldProps> = ({ label, required, children }) => (
   <div>
     <label className='oai-label'>
       {label} {required && <span style={{ color: 'var(--oai-red)' }}>*</span>}
@@ -17,7 +24,7 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-const EditBook = () => {
+const EditBook: React.FC = () => {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [isbn, setIsbn] = useState('');
@@ -30,18 +37,18 @@ const EditBook = () => {
   const [language, setLanguage] = useState('');
   const [shelfName, setShelfName] = useState('');
   const [shelfNumber, setShelfNumber] = useState('');
-  const [coverThumb, setCoverThumb] = useState(null);
+  const [coverThumb, setCoverThumb] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const fileRef = useRef(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await axios.get(`/books/${id}`);
+        const response = await axios.get<{ data: Book }>(`/books/${id}`);
         const d = response.data.data;
         setTitle(d.title || '');
         setAuthor(d.author || '');
@@ -66,11 +73,11 @@ const EditBook = () => {
     fetchData();
   }, [id]);
 
-  const handleCoverChange = (e) => {
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setCoverThumb(reader.result);
+    reader.onload = () => setCoverThumb(reader.result as string);
     reader.readAsDataURL(file);
   };
 

@@ -6,11 +6,16 @@ import { AiOutlineEdit } from 'react-icons/ai';
 import { BsInfoCircle } from 'react-icons/bs';
 import { MdOutlineDelete } from 'react-icons/md';
 import BookModal from './BookModal';
+import type { Book } from '../../types/book';
 
 const PLACEHOLDER =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160"><rect width="120" height="160" fill="%231c1c1c"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="40" fill="%23666680">📚</text></svg>';
 
-const BookSingleCard = ({ book }) => {
+interface BookSingleCardProps {
+  book: Book;
+}
+
+const BookSingleCard: React.FC<BookSingleCardProps> = ({ book }) => {
   const [showModal, setShowModal] = useState(false);
   const thumb = book.cover_thumbnail || PLACEHOLDER;
 
@@ -79,7 +84,7 @@ const BookSingleCard = ({ book }) => {
           style={{ borderTop: '1px solid var(--oai-border)' }}
         >
           <span className='font-semibold text-sm' style={{ color: 'var(--oai-text)' }}>
-            ${parseFloat(book.price || 0).toFixed(2)}
+            ${parseFloat(String(book.price || 0)).toFixed(2)}
           </span>
           {book.stock > 0 ? (
             <span className='badge-green'>{book.stock} in stock</span>
@@ -100,7 +105,7 @@ const BookSingleCard = ({ book }) => {
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
             onClick={() => setShowModal(true)}
           />
-          <Link to={`/books/details/${book.id || book._id}`}>
+          <Link to={`/books/details/${book.id}`}>
             <BsInfoCircle
               className='text-xl transition-colors'
               style={{ color: 'var(--oai-green)' }}
@@ -108,7 +113,7 @@ const BookSingleCard = ({ book }) => {
               onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-green)')}
             />
           </Link>
-          <Link to={`/books/edit/${book.id || book._id}`}>
+          <Link to={`/books/edit/${book.id}`}>
             <AiOutlineEdit
               className='text-xl transition-colors'
               style={{ color: 'var(--oai-muted)' }}
@@ -116,7 +121,7 @@ const BookSingleCard = ({ book }) => {
               onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
             />
           </Link>
-          <Link to={`/books/delete/${book.id || book._id}`}>
+          <Link to={`/books/delete/${book.id}`}>
             <MdOutlineDelete
               className='text-xl transition-colors'
               style={{ color: 'var(--oai-red)' }}

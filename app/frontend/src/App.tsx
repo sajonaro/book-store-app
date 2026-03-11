@@ -1,15 +1,15 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import Home from './pages/Home';
-import CreateBook from './pages/CreateBooks';
-import ShowBook from './pages/ShowBook';
-import EditBook from './pages/EditBook';
-import DeleteBook from './pages/DeleteBook';
-import LoginPage from './pages/LoginPage';
-import SearchPage from './pages/SearchPage';
-import ProtectedRoute from './components/ProtectedRoute';
+import Home from './pages/Home'
+import CreateBook from './pages/CreateBooks'
+import ShowBook from './pages/ShowBook'
+import EditBook from './pages/EditBook'
+import DeleteBook from './pages/DeleteBook'
+import LoginPage from './pages/LoginPage'
+import SearchPage from './pages/SearchPage'
+import ProtectedRoute from './components/ProtectedRoute'
 
-const App = () => {
+const App: React.FC = () => {
   return (
     <Routes>
       {/* Public routes */}

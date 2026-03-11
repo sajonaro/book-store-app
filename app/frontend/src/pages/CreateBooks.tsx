@@ -8,7 +8,13 @@ import Spinner from '../components/Spinner';
 const PLACEHOLDER =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160"><rect width="120" height="160" fill="%231c1c1c"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="40" fill="%23666680">📚</text></svg>';
 
-const Field = ({ label, required, children }) => (
+interface FieldProps {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}
+
+const Field: React.FC<FieldProps> = ({ label, required, children }) => (
   <div>
     <label className='oai-label'>
       {label} {required && <span style={{ color: 'var(--oai-red)' }}>*</span>}
@@ -17,8 +23,24 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
+interface PrefillState {
+  title?: string;
+  author?: string;
+  isbn?: string;
+  publisher?: string;
+  year?: number;
+  genre?: string;
+  language?: string;
+  description?: string;
+}
+
+interface LocationState {
+  prefill?: PrefillState;
+  cover_thumbnail?: string;
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
-const CreateBooks = () => {
+const CreateBooks: React.FC = () => {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [isbn, setIsbn] = useState('');
@@ -31,20 +53,21 @@ const CreateBooks = () => {
   const [language, setLanguage] = useState('');
   const [shelfName, setShelfName] = useState('');
   const [shelfNumber, setShelfNumber] = useState('');
-  const [coverThumb, setCoverThumb] = useState(null);
+  const [coverThumb, setCoverThumb] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [recognizing, setRecognizing] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const fileInputRef = useRef(null);
-  const coverFileRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverFileRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { enqueueSnackbar } = useSnackbar();
 
   // Pre-fill from navigation state (e.g. legacy RecognizePage flow)
   useEffect(() => {
-    const prefill = location.state?.prefill;
+    const state = location.state as LocationState | null;
+    const prefill = state?.prefill;
     if (!prefill) return;
     if (prefill.title) setTitle(prefill.title);
     if (prefill.author) setAuthor(prefill.author);
@@ -54,18 +77,15 @@ const CreateBooks = () => {
     if (prefill.genre) setGenre(prefill.genre);
     if (prefill.language) setLanguage(prefill.language);
     if (prefill.description) setDescription(prefill.description);
-    if (location.state?.cover_thumbnail) setCoverThumb(location.state.cover_thumbnail);
+    if (state?.cover_thumbnail) setCoverThumb(state.cover_thumbnail);
     enqueueSnackbar('Scan results loaded — review the form and save.', { variant: 'success' });
     window.history.replaceState({}, '');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleFileChange = (e) => {
-    setSelectedFiles(Array.from(e.target.files));
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedFiles(Array.from(e.target.files || []));
   };
 
-  // Scan photos and populate form fields directly — no separate review panel.
-  // If the book already exists in the catalogue (duplicate detection), the
-  // backend increments its stock by 1 and returns { duplicate: true }.
   const handleRecognize = async () => {
     if (selectedFiles.length === 0) {
       enqueueSnackbar('Please select at least one book photo first', { variant: 'warning' });
@@ -75,11 +95,18 @@ const CreateBooks = () => {
     try {
       const formData = new FormData();
       selectedFiles.forEach((file) => formData.append('photos', file));
-      const res = await axios.post('/books/recognize', formData, {
+      const res = await axios.post<{
+        duplicate?: boolean;
+        existing_book?: { title?: string; stock?: number };
+        data?: {
+          title?: string; author?: string; isbn?: string; publisher?: string;
+          year?: number; genre?: string; language?: string; description?: string;
+        };
+        cover_thumbnail?: string;
+      }>('/books/recognize', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // Duplicate detected — stock already incremented by the backend
       if (res.data?.duplicate) {
         const book = res.data.existing_book;
         const name = book?.title ?? 'this book';
@@ -94,7 +121,6 @@ const CreateBooks = () => {
       const meta = res.data?.data ?? {};
       const thumb = res.data?.cover_thumbnail ?? null;
 
-      // Populate fields directly — user edits in-place before saving
       if (meta.title) setTitle(meta.title);
       if (meta.author) setAuthor(meta.author);
       if (meta.isbn) setIsbn(meta.isbn);
@@ -107,19 +133,20 @@ const CreateBooks = () => {
 
       setSelectedFiles([]);
       enqueueSnackbar('Fields populated from scan — review and save.', { variant: 'success' });
-    } catch (err) {
-      const msg = err.response?.data?.msg || 'Recognition failed — please fill in the fields manually.';
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { msg?: string } } }).response?.data?.msg
+        || 'Recognition failed — please fill in the fields manually.';
       enqueueSnackbar(msg, { variant: 'error' });
     } finally {
       setRecognizing(false);
     }
   };
 
-  const handleCoverChange = (e) => {
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setCoverThumb(reader.result);
+    reader.onload = () => setCoverThumb(reader.result as string);
     reader.readAsDataURL(file);
   };
 

@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
-import { UserModel } from '../models/userModel.js';
+import { UserModel } from '../models/userModel';
 
 const router = express.Router();
 
@@ -15,9 +15,9 @@ const authLimiter = rateLimit({
 });
 
 // POST /auth/login
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', authLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body as { email?: unknown; password?: unknown };
 
     if (!email || typeof email !== 'string') {
       return res.status(400).json({ msg: 'Email is required' });
@@ -43,8 +43,8 @@ router.post('/login', authLimiter, async (req, res) => {
       token,
       user: { id: user.id, name: user.name, email: user.email },
     });
-  } catch (error) {
-    console.error(error.message);
+  } catch (error: unknown) {
+    console.error((error as Error).message);
     return res.status(500).json({ msg: 'Internal server error' });
   }
 });

@@ -2,11 +2,17 @@ import React from 'react';
 import { AiOutlineClose } from 'react-icons/ai';
 import { BiUserCircle } from 'react-icons/bi';
 import { PiBookOpenTextLight } from 'react-icons/pi';
+import type { Book } from '../../types/book';
 
 const PLACEHOLDER =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160"><rect width="120" height="160" fill="%231c1c1c"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="40" fill="%23666680">📚</text></svg>';
 
-const BookModal = ({ book, onClose }) => {
+interface BookModalProps {
+  book: Book;
+  onClose: () => void;
+}
+
+const BookModal: React.FC<BookModalProps> = ({ book, onClose }) => {
   const thumb = book.cover_thumbnail || PLACEHOLDER;
 
   return (
@@ -111,7 +117,7 @@ const BookModal = ({ book, onClose }) => {
             style={{ borderTop: '1px solid var(--oai-border)' }}
           >
             <span className='text-xl font-semibold' style={{ color: 'var(--oai-green)' }}>
-              ${parseFloat(book.price || 0).toFixed(2)}
+              ${parseFloat(String(book.price || 0)).toFixed(2)}
             </span>
             {book.stock > 0 ? (
               <span className='badge-green'>{book.stock} in stock</span>

@@ -7,28 +7,29 @@ import { BiUserCircle } from 'react-icons/bi';
 import { BsInfoCircle } from 'react-icons/bs';
 import { AiOutlineEdit } from 'react-icons/ai';
 import { MdOutlineDelete } from 'react-icons/md';
+import type { Book } from '../types/book';
 
-const SearchPage = () => {
+const SearchPage: React.FC = () => {
   const [query, setQuery] = useState('');
-  const [books, setBooks] = useState([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
 
   let isAdmin = false;
   try {
-    const session = JSON.parse(localStorage.getItem('session'));
+    const session = JSON.parse(localStorage.getItem('session') || 'null') as { role?: string } | null;
     isAdmin = session?.role === 'admin';
   } catch {
     // ignore
   }
 
-  const handleSearch = async (e) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
     setLoading(true);
     setSearched(false);
     try {
-      const res = await axios.get('/books', { params: { q: query.trim() } });
+      const res = await axios.get<{ data: Book[] }>('/books', { params: { q: query.trim() } });
       setBooks(res.data.data || []);
     } catch {
       setBooks([]);
@@ -99,7 +100,7 @@ const SearchPage = () => {
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
               {books.map((book) => (
                 <div
-                  key={book.id || book._id}
+                  key={book.id}
                   className='oai-card p-4 transition-all duration-150 animate-fade-in'
                   style={{ cursor: 'default' }}
                   onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--oai-border-2)')}
@@ -125,7 +126,7 @@ const SearchPage = () => {
                     style={{ borderTop: '1px solid var(--oai-border)' }}
                   >
                     <span className='font-semibold text-sm' style={{ color: 'var(--oai-text)' }}>
-                      ${parseFloat(book.price || 0).toFixed(2)}
+                      ${parseFloat(String(book.price || 0)).toFixed(2)}
                     </span>
                     {book.stock > 0 ? (
                       <span className='badge-green'>{book.stock} in stock</span>
@@ -137,7 +138,7 @@ const SearchPage = () => {
                     className='flex justify-end gap-3 mt-3 pt-3'
                     style={{ borderTop: '1px solid var(--oai-border)' }}
                   >
-                    <Link to={`/books/details/${book.id || book._id}`}>
+                    <Link to={`/books/details/${book.id}`}>
                       <BsInfoCircle
                         className='text-xl transition-colors'
                         style={{ color: 'var(--oai-green)' }}
@@ -147,7 +148,7 @@ const SearchPage = () => {
                     </Link>
                     {isAdmin && (
                       <>
-                        <Link to={`/books/edit/${book.id || book._id}`}>
+                        <Link to={`/books/edit/${book.id}`}>
                           <AiOutlineEdit
                             className='text-xl transition-colors'
                             style={{ color: 'var(--oai-muted)' }}
@@ -155,7 +156,7 @@ const SearchPage = () => {
                             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
                           />
                         </Link>
-                        <Link to={`/books/delete/${book.id || book._id}`}>
+                        <Link to={`/books/delete/${book.id}`}>
                           <MdOutlineDelete
                             className='text-xl transition-colors'
                             style={{ color: 'var(--oai-red)' }}

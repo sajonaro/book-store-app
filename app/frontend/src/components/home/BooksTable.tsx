@@ -3,11 +3,16 @@ import { Link } from 'react-router-dom';
 import { AiOutlineEdit } from 'react-icons/ai';
 import { BsInfoCircle } from 'react-icons/bs';
 import { MdOutlineDelete } from 'react-icons/md';
+import type { Book } from '../../types/book';
 
 const PLACEHOLDER =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="54" viewBox="0 0 40 54"><rect width="40" height="54" fill="%231c1c1c"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="18" fill="%23666680">📚</text></svg>';
 
-const BooksTable = ({ books }) => {
+interface BooksTableProps {
+  books: Book[];
+}
+
+const BooksTable: React.FC<BooksTableProps> = ({ books }) => {
   return (
     <div
       className='overflow-x-auto rounded-xl'
@@ -40,7 +45,7 @@ const BooksTable = ({ books }) => {
         <tbody>
           {books.map((book, index) => (
             <tr
-              key={book.id || book._id}
+              key={book.id}
               style={{ borderBottom: '1px solid var(--oai-border)' }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--oai-surface-2)')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
@@ -86,7 +91,7 @@ const BooksTable = ({ books }) => {
                   : '—'}
               </td>
               <td className='px-4 py-3 text-right font-semibold max-md:hidden' style={{ color: 'var(--oai-text)' }}>
-                ${parseFloat(book.price || 0).toFixed(2)}
+                ${parseFloat(String(book.price || 0)).toFixed(2)}
               </td>
               <td className='px-4 py-3 text-center max-md:hidden'>
                 {book.stock > 0 ? (
@@ -97,7 +102,7 @@ const BooksTable = ({ books }) => {
               </td>
               <td className='px-4 py-3'>
                 <div className='flex justify-center gap-3'>
-                  <Link to={`/books/details/${book.id || book._id}`}>
+                  <Link to={`/books/details/${book.id}`}>
                     <BsInfoCircle
                       className='text-lg transition-colors'
                       style={{ color: 'var(--oai-green)' }}
@@ -105,7 +110,7 @@ const BooksTable = ({ books }) => {
                       onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-green)')}
                     />
                   </Link>
-                  <Link to={`/books/edit/${book.id || book._id}`}>
+                  <Link to={`/books/edit/${book.id}`}>
                     <AiOutlineEdit
                       className='text-lg transition-colors'
                       style={{ color: 'var(--oai-muted)' }}
@@ -113,7 +118,7 @@ const BooksTable = ({ books }) => {
                       onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
                     />
                   </Link>
-                  <Link to={`/books/delete/${book.id || book._id}`}>
+                  <Link to={`/books/delete/${book.id}`}>
                     <MdOutlineDelete
                       className='text-lg transition-colors'
                       style={{ color: 'var(--oai-red)' }}

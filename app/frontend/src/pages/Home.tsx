@@ -5,18 +5,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MdOutlineAddBox } from 'react-icons/md';
 import BooksCard from '../components/home/BooksCard';
 import BooksTable from '../components/home/BooksTable';
+import type { Book } from '../types/book';
 
-const Home = () => {
-  const [books, setBooks] = useState([]);
+const Home: React.FC = () => {
+  const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showType, setShowType] = useState('table');
+  const [showType, setShowType] = useState<'table' | 'card'>('table');
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchBooks = async () => {
       setLoading(true);
       try {
-        const response = await axios.get('/books');
+        const response = await axios.get<{ data: Book[] }>('/books');
         setBooks(response.data.data);
       } catch (error) {
         console.error(error);
@@ -87,7 +88,7 @@ const Home = () => {
             className='flex items-center gap-1 p-1 rounded-lg'
             style={{ backgroundColor: 'var(--oai-surface)', border: '1px solid var(--oai-border)' }}
           >
-            {['table', 'card'].map((type) => (
+            {(['table', 'card'] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => setShowType(type)}
