@@ -1,11 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-
-interface Session {
-  role: string;
-  token?: string;
-  user?: { id: string; name: string; email: string };
-}
+import { useSession } from '../hooks/useSession';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,12 +8,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = false }) => {
-  let session: Session | null = null;
-  try {
-    session = JSON.parse(localStorage.getItem('session') || 'null') as Session | null;
-  } catch {
-    // malformed localStorage entry
-  }
+  const session = useSession();
 
   if (!session) {
     return <Navigate to='/login' replace />;

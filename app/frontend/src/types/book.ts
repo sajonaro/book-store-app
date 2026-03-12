@@ -5,7 +5,6 @@ export interface Book {
   isbn?: string | null;
   publisher?: string | null;
   publish_year?: number | null;
-  publishYear?: number | null;
   genre?: string | null;
   description?: string | null;
   price: number;
