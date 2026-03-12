@@ -5,10 +5,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 import Spinner from '../components/Spinner';
 
-const DeleteBook = () => {
+const DeleteBook: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { enqueueSnackbar } = useSnackbar();
 
   const handleDeleteBook = async () => {

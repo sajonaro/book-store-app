@@ -26,4 +26,4 @@ EXPOSE 5555
 
 ENV NODE_ENV=production
 
-CMD ["bun", "run", "index.js"]
+CMD ["bun", "run", "index.ts"]

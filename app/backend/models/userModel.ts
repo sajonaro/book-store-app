@@ -11,10 +11,16 @@ const pool = new Pool({
   port: 5432,
 });
 
+export interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  pwd_hash: string;
+  created_at?: Date;
+}
+
 // Seed default admin user if not already present.
-// The users table is created by app/db/initialize-schema.sql via
-// PostgreSQL's docker-entrypoint-initdb.d mechanism.
-async function seedDefaultAdmin() {
+async function seedDefaultAdmin(): Promise<void> {
   const existing = await pool.query(
     'SELECT id FROM users WHERE email = $1',
     ['admin@bookstore.com'],
@@ -31,7 +37,7 @@ async function seedDefaultAdmin() {
   console.log('Users table ready');
 }
 
-async function findByEmail(email) {
+async function findByEmail(email: string): Promise<UserRow | null> {
   const result = await pool.query(
     'SELECT * FROM users WHERE email = $1',
     [email],

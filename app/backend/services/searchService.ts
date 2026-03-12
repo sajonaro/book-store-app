@@ -3,13 +3,15 @@
  * The @elastic/elasticsearch SDK uses Node.js http internals that break on Bun.
  */
 
+import type { BookRow } from '../models/bookModel';
+
 const ELASTIC_URL = (process.env.ELASTIC_URL || 'http://elastic:9200').replace(/\/$/, '');
 const INDEX = 'books';
 
 let esAvailable = false;
 
 /** Create / ensure the books index exists */
-async function ensureIndex() {
+async function ensureIndex(): Promise<void> {
   try {
     const res = await fetch(`${ELASTIC_URL}/${INDEX}`, { method: 'HEAD' });
     if (res.status === 404) {
@@ -34,14 +36,14 @@ async function ensureIndex() {
     }
     esAvailable = true;
     console.log('Elasticsearch index ready');
-  } catch (err) {
+  } catch (err: unknown) {
     esAvailable = false;
-    console.log('Elasticsearch not available at startup:', err.message);
+    console.log('Elasticsearch not available at startup:', (err as Error).message);
   }
 }
 
 /** Index or update a single book document */
-async function indexBook(book) {
+async function indexBook(book: BookRow): Promise<void> {
   if (!esAvailable) return;
   try {
     await fetch(`${ELASTIC_URL}/${INDEX}/_doc/${book.id}`, {
@@ -58,18 +60,18 @@ async function indexBook(book) {
         language:     book.language,
       }),
     });
-  } catch (err) {
-    console.log('Failed to index book in Elasticsearch:', err.message);
+  } catch (err: unknown) {
+    console.log('Failed to index book in Elasticsearch:', (err as Error).message);
   }
 }
 
 /** Remove a book document from the index */
-async function removeBook(id) {
+async function removeBook(id: string): Promise<void> {
   if (!esAvailable) return;
   try {
     await fetch(`${ELASTIC_URL}/${INDEX}/_doc/${id}`, { method: 'DELETE' });
-  } catch (err) {
-    console.log('Failed to remove book from Elasticsearch index:', err.message);
+  } catch (err: unknown) {
+    console.log('Failed to remove book from Elasticsearch index:', (err as Error).message);
   }
 }
 
@@ -77,7 +79,7 @@ async function removeBook(id) {
  * Full-text search across title, author, description, publisher.
  * Returns an array of matching book IDs, or null when ES is unavailable.
  */
-async function searchBooks(query) {
+async function searchBooks(query: string): Promise<string[] | null> {
   if (!esAvailable) return null;
   try {
     const res = await fetch(`${ELASTIC_URL}/${INDEX}/_search`, {
@@ -95,10 +97,10 @@ async function searchBooks(query) {
       }),
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = await res.json() as { hits?: { hits?: Array<{ _id: string }> } };
     return data.hits?.hits?.map((h) => h._id) ?? [];
-  } catch (err) {
-    console.log('Elasticsearch search failed:', err.message);
+  } catch (err: unknown) {
+    console.log('Elasticsearch search failed:', (err as Error).message);
     return null;
   }
 }

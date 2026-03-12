@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useSnackbar } from 'notistack';
 
-const LoginPage = () => {
-  const [role, setRole] = useState('user');
+const LoginPage: React.FC = () => {
+  const [role, setRole] = useState<'user' | 'admin'>('user');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ const LoginPage = () => {
     navigate('/search');
   };
 
-  const handleAdminLogin = async (e) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
       enqueueSnackbar('Email is required', { variant: 'warning' });
@@ -28,15 +28,18 @@ const LoginPage = () => {
     }
     setLoading(true);
     try {
-      const res = await axios.post('/auth/login', { email: email.trim(), password });
+      const res = await axios.post<{ token: string; user: { name: string } }>('/auth/login', {
+        email: email.trim(),
+        password,
+      });
       localStorage.setItem(
         'session',
         JSON.stringify({ role: 'admin', token: res.data.token, user: res.data.user }),
       );
       enqueueSnackbar(`Welcome, ${res.data.user.name}!`, { variant: 'success' });
       navigate('/home');
-    } catch (err) {
-      const msg = err.response?.data?.msg || 'Login failed';
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { msg?: string } } }).response?.data?.msg || 'Login failed';
       enqueueSnackbar(msg, { variant: 'error' });
     } finally {
       setLoading(false);
@@ -73,7 +76,7 @@ const LoginPage = () => {
           <label className='oai-label'>I am a…</label>
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value)}
+            onChange={(e) => setRole(e.target.value as 'user' | 'admin')}
             className='oai-input'
           >
             <option value='user'>User (Buyer)</option>

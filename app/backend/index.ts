@@ -1,12 +1,12 @@
-import express from 'express';
-import booksRoute from './routes/booksRoute.js';
+import express, { Request, Response, NextFunction } from 'express';
+import booksRoute from './routes/booksRoute';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { UserModel } from './models/userModel.js';
-import { initIndex } from './services/searchService.js';
-import authRoute from './routes/authRoute.js';
+import { UserModel } from './models/userModel';
+import { initIndex } from './services/searchService';
+import authRoute from './routes/authRoute';
 
 dotenv.config();
 
@@ -15,7 +15,6 @@ const PORT = process.env.PORT || 5555;
 const app = express();
 
 // Trust the first proxy (nginx) so express-rate-limit can read the real IP
-// from X-Forwarded-For without throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
 app.set('trust proxy', 1);
 
 // Security headers
@@ -28,7 +27,6 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, server-to-server)
         if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) return callback(null, true);
         return callback(new Error('Not allowed by CORS'));
@@ -55,13 +53,13 @@ app.use('/auth', authRoute);
 app.use('/books', booksRoute);
 
 // 404 handler
-app.use((_req, res) => {
+app.use((_req: Request, res: Response) => {
     res.status(404).json({ msg: 'Route not found' });
 });
 
 // Global error handler — never expose stack traces in production
-// eslint-disable-next-line no-unused-vars
-app.use((err, _req, res, _next) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
     console.error(err.stack);
     const statusCode = err.status || 500;
     const message =
@@ -69,20 +67,16 @@ app.use((err, _req, res, _next) => {
     res.status(statusCode).json({ msg: message });
 });
 
-// Seed default data, then Elasticsearch (best-effort), then start server.
-// Schema is created by app/db/initialize-schema.sql via PostgreSQL's
-// docker-entrypoint-initdb.d mechanism — no runtime DDL needed here.
-async function start() {
+async function start(): Promise<void> {
     try {
         await UserModel.seedDefaultAdmin();
-    } catch (err) {
-        console.error('FATAL: Failed to seed default admin:', err.message);
+    } catch (err: unknown) {
+        console.error('FATAL: Failed to seed default admin:', (err as Error).message);
         process.exit(1);
     }
 
-    // Elasticsearch init is best-effort — don't block startup
-    initIndex().catch((err) => {
-        console.warn('Elasticsearch initialization failed (continuing without it):', err.message);
+    initIndex().catch((err: unknown) => {
+        console.warn('Elasticsearch initialization failed (continuing without it):', (err as Error).message);
     });
 
     app.listen(PORT, () => {
