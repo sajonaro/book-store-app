@@ -13,6 +13,7 @@ export const pool = new Pool({
 
 export interface BookRow {
     id: string;
+    tenant_id: string;
     title: string;
     author: string;
     isbn?: string | null;
@@ -26,6 +27,7 @@ export interface BookRow {
     shelf_name?: string | null;
     shelf_number?: string | null;
     cover_thumbnail?: string | null;
+    keywords?: string[] | null;
     title_author_hash?: string;
     created_at?: Date;
     updated_at?: Date;
@@ -51,6 +53,7 @@ export interface BookCreateFields {
     shelf_name?: string | null;
     shelf_number?: string | null;
     cover_thumbnail?: string;
+    keywords?: string[] | null;
 }
 
 /** Convert a pg BYTEA result (Buffer) → base64 data-URI string, or null. */
@@ -78,35 +81,60 @@ function normalizeBook(row: BookRow | null | undefined): BookRow | null {
     };
 }
 
-// Query helpers
+/** Extended book row with tenant store_name — returned for superuser cross-tenant queries */
+export interface BookRowWithTenant extends BookRow {
+    store_name: string;
+    slug: string;
+}
+
+// Query helpers — all queries are scoped to a tenantId for full data isolation
 export const BookModel = {
-    async findAll(): Promise<BookRow[]> {
+    /**
+     * findAllCrossTenant — superuser only.
+     * Returns ALL books from ALL tenants, including the tenant store_name and slug.
+     */
+    async findAllCrossTenant(): Promise<BookRowWithTenant[]> {
         const result = await pool.query(
-            'SELECT * FROM books ORDER BY created_at DESC'
+            `SELECT b.*, t.store_name, t.slug
+             FROM books b
+             JOIN tenants t ON t.id = b.tenant_id
+             ORDER BY t.store_name, b.created_at DESC`
+        );
+        return result.rows.map((row) => ({
+            ...normalizeBook(row) as BookRow,
+            store_name: row.store_name as string,
+            slug: row.slug as string,
+        }));
+    },
+
+    async findAll(tenantId: string): Promise<BookRow[]> {
+        const result = await pool.query(
+            'SELECT * FROM books WHERE tenant_id = $1 ORDER BY created_at DESC',
+            [tenantId]
         );
         return result.rows.map(normalizeBook).filter(Boolean) as BookRow[];
     },
 
-    async findById(id: string): Promise<BookRow | null> {
+    async findById(id: string, tenantId: string): Promise<BookRow | null> {
         const result = await pool.query(
-            'SELECT * FROM books WHERE id = $1',
-            [id]
+            'SELECT * FROM books WHERE id = $1 AND tenant_id = $2',
+            [id, tenantId]
         );
         return normalizeBook(result.rows[0]) || null;
     },
 
     /**
-     * Find a book by identity:
+     * Find a book by identity within a tenant:
      *   - If isbn is provided, look up by ISBN first.
      *   - Otherwise, call book_identity_hash(title, author) in the DB and
      *     look up by title_author_hash.
      * Returns the book row (normalized) or null if not found.
      */
-    async findByIdentity({ isbn, title, author }: BookIdentity): Promise<BookRow | null> {
+    async findByIdentity(tenantId: string, { isbn, title, author }: BookIdentity): Promise<BookRow | null> {
         if (isbn) {
             const result = await pool.query(
-                'SELECT * FROM books WHERE isbn = $1',
-                [isbn]
+                'SELECT * FROM books WHERE tenant_id = $1 AND isbn = $2',
+                [tenantId, isbn]
             );
             if (result.rows[0]) return normalizeBook(result.rows[0]);
         }
@@ -115,8 +143,9 @@ export const BookModel = {
         if (title && author) {
             const result = await pool.query(
                 `SELECT * FROM books
-                 WHERE title_author_hash = book_identity_hash($1, $2)`,
-                [title, author]
+                 WHERE tenant_id = $1
+                   AND title_author_hash = book_identity_hash($2, $3)`,
+                [tenantId, title, author]
             );
             if (result.rows[0]) return normalizeBook(result.rows[0]);
         }
@@ -129,9 +158,9 @@ export const BookModel = {
      * Only patches a field when the existing value is NULL and a new value is provided.
      * Returns the updated book.
      */
-    async incrementStockAndPatch(id: string, patch: { isbn?: string | null } = {}): Promise<BookRow | null> {
+    async incrementStockAndPatch(id: string, tenantId: string, patch: { isbn?: string | null } = {}): Promise<BookRow | null> {
         const setClauses = ['stock = stock + 1', 'updated_at = now()'];
-        const params: unknown[] = [id];
+        const params: unknown[] = [id, tenantId];
 
         if (patch.isbn) {
             setClauses.push(`isbn = CASE WHEN isbn IS NULL THEN $${params.length + 1} ELSE isbn END`);
@@ -139,36 +168,39 @@ export const BookModel = {
         }
 
         const result = await pool.query(
-            `UPDATE books SET ${setClauses.join(', ')} WHERE id = $1 RETURNING *`,
+            `UPDATE books SET ${setClauses.join(', ')} WHERE id = $1 AND tenant_id = $2 RETURNING *`,
             params
         );
         return normalizeBook(result.rows[0]) || null;
     },
 
-    async create(fields: BookCreateFields): Promise<BookRow> {
+    async create(tenantId: string, fields: BookCreateFields): Promise<BookRow> {
         const {
             title, author, isbn, publisher, publish_year,
             genre, description, price, stock,
-            language, shelf_name, shelf_number, cover_thumbnail,
+            language, shelf_name, shelf_number, cover_thumbnail, keywords,
         } = fields;
 
         const thumbBuf = dataUriToBuffer(cover_thumbnail);
+        const kwArr = keywords && keywords.length > 0 ? keywords : null;
 
         const result = await pool.query(
             `INSERT INTO books
-                (title, author, isbn, publisher, publish_year, genre, description,
-                 price, stock, language, shelf_name, shelf_number, cover_thumbnail,
+                (tenant_id, title, author, isbn, publisher, publish_year, genre, description,
+                 price, stock, language, shelf_name, shelf_number, cover_thumbnail, keywords,
                  title_author_hash)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                     book_identity_hash($14, $15))
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                     book_identity_hash($16, $17))
              RETURNING *`,
             [
+                tenantId,
                 title, author,
                 isbn ?? null, publisher ?? null, publish_year ?? null,
                 genre ?? null, description ?? null,
                 price ?? 0.00, stock ?? 0,
                 language ?? null, shelf_name ?? null, shelf_number ?? null,
                 thumbBuf ?? null,
+                kwArr,
                 // Extra params for book_identity_hash — same values, no type conflict
                 title, author,
             ]
@@ -176,14 +208,16 @@ export const BookModel = {
         return normalizeBook(result.rows[0]) as BookRow;
     },
 
-    async update(id: string, fields: BookCreateFields): Promise<BookRow | null> {
+    async update(id: string, tenantId: string, fields: BookCreateFields): Promise<BookRow | null> {
         const {
             title, author, isbn, publisher, publish_year,
             genre, description, price, stock,
-            language, shelf_name, shelf_number, cover_thumbnail,
+            language, shelf_name, shelf_number, cover_thumbnail, keywords,
         } = fields;
 
-        let thumbClause = '';
+        const kwArr = keywords && keywords.length > 0 ? keywords : null;
+
+        // Build dynamic params: fixed fields first, then optional cover, then keywords, then id+tenantId
         const params: unknown[] = [
             title, author,
             isbn ?? null, publisher ?? null, publish_year ?? null,
@@ -194,16 +228,28 @@ export const BookModel = {
             title, author,
         ];
 
+        let thumbClause = '';
+        let kwParam = '$15';
+        let idParam: string;
+        let tenantParam: string;
+
         if (cover_thumbnail !== undefined) {
             const thumbBuf = dataUriToBuffer(cover_thumbnail);
             thumbClause = ', cover_thumbnail = $15';
             params.push(thumbBuf ?? null); // $15
-            params.push(id);              // $16
+            kwParam = '$16';
+            params.push(kwArr);            // $16
+            params.push(id);               // $17
+            params.push(tenantId);         // $18
+            idParam = '$17';
+            tenantParam = '$18';
         } else {
-            params.push(id); // $15
+            params.push(kwArr);    // $15
+            params.push(id);       // $16
+            params.push(tenantId); // $17
+            idParam = '$16';
+            tenantParam = '$17';
         }
-
-        const idParam = cover_thumbnail !== undefined ? '$16' : '$15';
 
         const result = await pool.query(
             `UPDATE books SET
@@ -221,18 +267,19 @@ export const BookModel = {
                 shelf_number      = $12,
                 title_author_hash = book_identity_hash($13, $14)
                 ${thumbClause},
+                keywords          = ${kwParam},
                 updated_at        = now()
-             WHERE id = ${idParam}
+             WHERE id = ${idParam} AND tenant_id = ${tenantParam}
              RETURNING *`,
             params
         );
         return normalizeBook(result.rows[0]) || null;
     },
 
-    async remove(id: string): Promise<BookRow | null> {
+    async remove(id: string, tenantId: string): Promise<BookRow | null> {
         const result = await pool.query(
-            'DELETE FROM books WHERE id = $1 RETURNING *',
-            [id]
+            'DELETE FROM books WHERE id = $1 AND tenant_id = $2 RETURNING *',
+            [id, tenantId]
         );
         return normalizeBook(result.rows[0]) || null;
     },

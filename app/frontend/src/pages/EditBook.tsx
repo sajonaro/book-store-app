@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../utils/api';
 import { useSnackbar } from 'notistack';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -20,7 +20,7 @@ const EditBook: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await axios.get<{ data: Book }>(`/books/${id}`);
+        const response = await api.get<{ data: Book }>(`/books/${id}`);
         populateFromBook(response.data.data);
       } catch (error) {
         enqueueSnackbar('Failed to load book data', { variant: 'error' });
@@ -35,7 +35,7 @@ const EditBook: React.FC = () => {
   const handleEditBook = async () => {
     setLoading(true);
     try {
-      await axios.put(`/books/${id}`, toApiPayload());
+      await api.put(`/books/${id}`, toApiPayload());
       enqueueSnackbar('Book updated successfully', { variant: 'success' });
       navigate('/home');
     } catch (error) {

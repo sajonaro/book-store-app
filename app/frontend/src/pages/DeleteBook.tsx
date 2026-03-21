@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../utils/api';
 import { useSnackbar } from 'notistack';
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -14,7 +14,7 @@ const DeleteBook: React.FC = () => {
   const handleDeleteBook = async () => {
     setLoading(true);
     try {
-      await axios.delete(`/books/${id}`);
+      await api.delete(`/books/${id}`);
       enqueueSnackbar('Book deleted successfully', { variant: 'success' });
       navigate('/home');
     } catch (error) {

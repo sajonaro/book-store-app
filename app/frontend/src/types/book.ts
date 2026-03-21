@@ -13,6 +13,10 @@ export interface Book {
   shelf_name?: string | null;
   shelf_number?: string | null;
   cover_thumbnail?: string | null;
+  keywords?: string[] | null;
   created_at?: string;
   updated_at?: string;
+  // Present only in superuser cross-tenant responses
+  store_name?: string;
+  slug?: string;
 }

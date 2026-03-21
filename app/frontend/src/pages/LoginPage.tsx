@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useSnackbar } from 'notistack';
 
+interface LoginResponse {
+  token: string;
+  user: { id: string; name: string; email: string };
+  role: 'tenant-admin' | 'user' | 'superuser';
+  tenant: { id: string; store_name: string; slug: string } | null;
+}
+
 const LoginPage: React.FC = () => {
-  const [role, setRole] = useState<'user' | 'admin'>('user');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
 
-  const handleContinueAsUser = () => {
-    localStorage.setItem('session', JSON.stringify({ role: 'user' }));
-    navigate('/search');
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
       enqueueSnackbar('Email is required', { variant: 'warning' });
@@ -26,20 +27,33 @@ const LoginPage: React.FC = () => {
       enqueueSnackbar('Password is required', { variant: 'warning' });
       return;
     }
+
     setLoading(true);
     try {
-      const res = await axios.post<{ token: string; user: { name: string } }>('/auth/login', {
+      const res = await axios.post<LoginResponse>('/auth/login', {
         email: email.trim(),
         password,
       });
+
       localStorage.setItem(
         'session',
-        JSON.stringify({ role: 'admin', token: res.data.token, user: res.data.user }),
+        JSON.stringify({
+          role: res.data.role,
+          token: res.data.token,
+          user: res.data.user,
+          tenant: res.data.tenant,
+        }),
       );
-      enqueueSnackbar(`Welcome, ${res.data.user.name}!`, { variant: 'success' });
-      navigate('/home');
+
+      const greeting = res.data.role === 'superuser'
+        ? `Welcome, ${res.data.user.name}! (System Admin)`
+        : `Welcome, ${res.data.user.name}!`;
+      enqueueSnackbar(greeting, { variant: 'success' });
+      navigate(res.data.role === 'superuser' ? '/superuser' : '/home');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { msg?: string } } }).response?.data?.msg || 'Login failed';
+      const msg =
+        (err as { response?: { data?: { msg?: string } } }).response?.data?.msg ||
+        'Login failed';
       enqueueSnackbar(msg, { variant: 'error' });
     } finally {
       setLoading(false);
@@ -62,83 +76,69 @@ const LoginPage: React.FC = () => {
       >
         {/* Logo / title */}
         <div className='text-center mb-8'>
-          <div className='text-4xl mb-3'>📚</div>
-          <h1 className='text-2xl font-semibold' style={{ color: 'var(--oai-text)' }}>
-            BookStore
+          <div className='flex justify-center mb-3'>
+            <img src='/logo.svg' alt='Planet of Books' style={{ height: '64px', width: 'auto' }} />
+          </div>
+          <h1 className='store-brand-name' style={{ color: 'var(--oai-text)', fontSize: '2rem' }}>
+            Planet of Books
           </h1>
           <p className='text-sm mt-1' style={{ color: 'var(--oai-muted)' }}>
-            Inventory & Catalog System
+            Sign In
           </p>
         </div>
 
-        {/* Role selector */}
-        <div className='mb-5'>
-          <label className='oai-label'>I am a…</label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as 'user' | 'admin')}
-            className='oai-input'
+        <form onSubmit={handleLogin} className='space-y-4'>
+          <div>
+            <label className='oai-label'>Email</label>
+            <input
+              type='email'
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder='admin@yourstore.com'
+              className='oai-input'
+            />
+          </div>
+          <div>
+            <label className='oai-label'>Password</label>
+            <input
+              type='password'
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder='••••••••'
+              className='oai-input'
+            />
+          </div>
+          <button
+            type='submit'
+            disabled={loading}
+            className='btn-primary w-full mt-2'
+            style={{ padding: '0.625rem 1rem' }}
           >
-            <option value='user'>User (Buyer)</option>
-            <option value='admin'>Admin</option>
-          </select>
+            {loading ? 'Signing in…' : 'Sign In'}
+          </button>
+        </form>
+
+        {/* Register link */}
+        <div className='mt-5 text-center text-sm' style={{ color: 'var(--oai-muted)' }}>
+          New store owner?{' '}
+          <Link
+            to='/register'
+            className='font-medium'
+            style={{ color: 'var(--oai-green)' }}
+          >
+            Register your store →
+          </Link>
         </div>
 
-        {role === 'admin' ? (
-          <form onSubmit={handleAdminLogin} className='space-y-4'>
-            <div>
-              <label className='oai-label'>Email</label>
-              <input
-                type='email'
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder='admin@bookstore.com'
-                className='oai-input'
-              />
-            </div>
-            <div>
-              <label className='oai-label'>Password</label>
-              <input
-                type='password'
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder='••••••••'
-                className='oai-input'
-              />
-            </div>
-            <button
-              type='submit'
-              disabled={loading}
-              className='btn-primary w-full mt-2'
-              style={{ padding: '0.625rem 1rem' }}
-            >
-              {loading ? 'Signing in…' : 'Sign in as Admin'}
-            </button>
-          </form>
-        ) : (
-          <div className='text-center'>
-            <p className='text-sm mb-5' style={{ color: 'var(--oai-muted)' }}>
-              No account needed. Browse and search the catalog freely.
-            </p>
-            <button
-              onClick={handleContinueAsUser}
-              className='btn-primary w-full'
-              style={{ padding: '0.625rem 1rem' }}
-            >
-              Continue as Buyer →
-            </button>
-          </div>
-        )}
-
-        {/* Divider line */}
+        {/* Footer */}
         <div
-          className='mt-8 pt-5 text-center text-xs'
+          className='mt-6 pt-5 text-center text-xs'
           style={{
             borderTop: '1px solid var(--oai-border)',
             color: 'var(--oai-subtle)',
           }}
         >
-          BookStore © {new Date().getFullYear()}
+          Planet of Books © {new Date().getFullYear()}
         </div>
       </div>
     </div>

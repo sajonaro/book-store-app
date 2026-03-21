@@ -1,13 +1,14 @@
-import axios from 'axios';
+import api from '../utils/api';
 import { useSnackbar } from 'notistack';
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import BackButton from '../components/BackButton';
 import Spinner from '../components/Spinner';
 import CoverUpload from '../components/shared/CoverUpload';
 import BookFormFields from '../components/shared/BookFormFields';
 import { useBookForm } from '../hooks/useBookForm';
 import { getErrorMessage } from '../utils/formatters';
+import { useSession } from '../hooks/useSession';
 
 interface LocationState {
   prefill?: Record<string, unknown>;
@@ -23,6 +24,8 @@ const CreateBooks: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { enqueueSnackbar } = useSnackbar();
+  const session = useSession();
+  const hasOpenaiKey = session?.tenant?.has_openai_key === true;
 
   useEffect(() => {
     const state = location.state as LocationState | null;
@@ -33,6 +36,10 @@ const CreateBooks: React.FC = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRecognize = async () => {
+    if (!hasOpenaiKey) {
+      enqueueSnackbar('No OpenAI API key configured. Add one in Store Settings.', { variant: 'warning' });
+      return;
+    }
     if (selectedFiles.length === 0) {
       enqueueSnackbar('Please select at least one book photo first', { variant: 'warning' });
       return;
@@ -41,7 +48,7 @@ const CreateBooks: React.FC = () => {
     try {
       const formData = new FormData();
       selectedFiles.forEach((file) => formData.append('photos', file));
-      const res = await axios.post('/books/recognize', formData, {
+      const res = await api.post('/books/recognize', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -68,7 +75,7 @@ const CreateBooks: React.FC = () => {
   const handleSaveBook = async () => {
     setLoading(true);
     try {
-      await axios.post('/books', toApiPayload());
+      await api.post('/books', toApiPayload());
       enqueueSnackbar('Book created successfully', { variant: 'success' });
       navigate('/home');
     } catch (error) {
@@ -99,9 +106,20 @@ const CreateBooks: React.FC = () => {
                   {selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Choose photo(s)…'}
                 </button>
               </div>
-              <button type='button' onClick={handleRecognize} disabled={recognizing || selectedFiles.length === 0} className='btn-secondary text-xs whitespace-nowrap'>
-                {recognizing ? 'Scanning…' : '🤖 Extract Metadata'}
-              </button>
+              {hasOpenaiKey ? (
+                <button type='button' onClick={handleRecognize} disabled={recognizing || selectedFiles.length === 0} className='btn-secondary text-xs whitespace-nowrap'>
+                  {recognizing ? 'Scanning…' : '🤖 Extract Metadata'}
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <button type='button' disabled className='btn-secondary text-xs whitespace-nowrap' style={{ opacity: 0.45, cursor: 'not-allowed' }}>
+                    🤖 Extract Metadata
+                  </button>
+                  <p className='text-xs' style={{ color: 'var(--oai-muted)', textAlign: 'center' }}>
+                    <Link to='/home/settings' style={{ color: 'var(--oai-green)' }}>Add an OpenAI key</Link> to enable AI scan
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

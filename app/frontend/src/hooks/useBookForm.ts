@@ -15,12 +15,14 @@ export interface BookFormState {
   shelfName: string;
   shelfNumber: string;
   coverThumb: string | null;
+  keywords: string[];
 }
 
 const EMPTY: BookFormState = {
   title: '', author: '', isbn: '', publisher: '', publishYear: '',
   genre: '', description: '', price: '', stock: '', language: '',
   shelfName: '', shelfNumber: '', coverThumb: null,
+  keywords: [],
 };
 
 export function useBookForm(initial?: Partial<BookFormState>) {
@@ -46,6 +48,7 @@ export function useBookForm(initial?: Partial<BookFormState>) {
       shelfName: d.shelf_name || '',
       shelfNumber: d.shelf_number || '',
       coverThumb: d.cover_thumbnail || null,
+      keywords: Array.isArray(d.keywords) ? d.keywords.filter(Boolean) : [],
     });
   };
 
@@ -62,6 +65,17 @@ export function useBookForm(initial?: Partial<BookFormState>) {
       ...(meta.language ? { language: meta.language as string } : {}),
       ...(meta.description ? { description: meta.description as string } : {}),
       ...(thumb ? { coverThumb: thumb } : {}),
+      // Merge AI-suggested keywords with any already entered
+      ...(Array.isArray(meta.keywords) && (meta.keywords as string[]).length > 0
+        ? {
+            keywords: Array.from(
+              new Set([
+                ...prev.keywords,
+                ...(meta.keywords as string[]).map((k) => String(k).trim().toLowerCase()).filter(Boolean),
+              ])
+            ),
+          }
+        : {}),
     }));
   };
 
@@ -80,6 +94,7 @@ export function useBookForm(initial?: Partial<BookFormState>) {
     shelf_name: form.shelfName || undefined,
     shelf_number: form.shelfNumber || undefined,
     cover_thumbnail: form.coverThumb || undefined,
+    keywords: form.keywords.length > 0 ? form.keywords : undefined,
   });
 
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {

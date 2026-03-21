@@ -18,11 +18,16 @@ def get_api_key() -> str:
     return path.read_text().strip()
 
 
-def create_client() -> OpenAI:
+def create_client(api_key: str | None = None) -> OpenAI:
+    """Create an OpenAI client. Uses the provided api_key if given, otherwise reads from file."""
+    if api_key:
+        return OpenAI(api_key=api_key)
     return OpenAI(api_key=get_api_key())
 
 
-def analyze_image(client: OpenAI, image_base64: str, prompt: str, mime_type: str = "image/png") -> dict:
+def analyze_image(
+    client: OpenAI, image_base64: str, prompt: str, mime_type: str = "image/png"
+) -> dict:
     cfg = get_openai_config()
 
     response = client.chat.completions.create(
@@ -36,14 +41,14 @@ def analyze_image(client: OpenAI, image_base64: str, prompt: str, mime_type: str
                         "type": "image_url",
                         "image_url": {
                             "url": f"data:{mime_type};base64,{image_base64}",
-                            "detail": cfg.get("image_detail", "high")
-                        }
-                    }
-                ]
+                            "detail": cfg.get("image_detail", "high"),
+                        },
+                    },
+                ],
             }
         ],
         max_tokens=cfg.get("max_tokens", 4096),
-        temperature=cfg.get("temperature", 0)
+        temperature=cfg.get("temperature", 0),
     )
 
     content = response.choices[0].message.content
@@ -62,19 +67,21 @@ def analyze_multiple_images(client: OpenAI, images: list[dict], prompt: str) -> 
 
     content = [{"type": "text", "text": prompt}]
     for img in images:
-        content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:{img['mime_type']};base64,{img['base64']}",
-                "detail": cfg.get("image_detail", "high")
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{img['mime_type']};base64,{img['base64']}",
+                    "detail": cfg.get("image_detail", "high"),
+                },
             }
-        })
+        )
 
     response = client.chat.completions.create(
         model=cfg.get("model", "gpt-4o"),
         messages=[{"role": "user", "content": content}],
         max_tokens=cfg.get("max_tokens", 4096),
-        temperature=cfg.get("temperature", 0)
+        temperature=cfg.get("temperature", 0),
     )
 
     resp_content = response.choices[0].message.content

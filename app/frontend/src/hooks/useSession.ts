@@ -1,7 +1,16 @@
+export interface TenantInfo {
+  id: string;
+  store_name: string;
+  slug: string;
+  logo_url?: string | null;
+  has_openai_key?: boolean;
+}
+
 interface Session {
   role: string;
   token?: string;
   user?: { id: string; name: string; email: string };
+  tenant?: TenantInfo;
 }
 
 export function useSession(): Session | null {
@@ -10,4 +19,16 @@ export function useSession(): Session | null {
   } catch {
     return null;
   }
+}
+
+export function getAuthHeader(): Record<string, string> {
+  try {
+    const session = JSON.parse(localStorage.getItem('session') || 'null') as Session | null;
+    if (session?.token) {
+      return { Authorization: `Bearer ${session.token}` };
+    }
+  } catch {
+    // ignore
+  }
+  return {};
 }

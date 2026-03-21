@@ -41,6 +41,9 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Docker-internal addresses — override .env values which point to localhost
+      POSTGRES_HOST: postgres
     volumes:
       - ./ai-api/credentials:/app/credentials:ro
     networks:
@@ -67,6 +70,10 @@ services:
       ELASTIC_URL: http://elastic:9200
       AI_API_URL: http://ai-api:8000
       ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-8081}
+      # Tenant encryption key — must be set in .env as a 64-char hex string
+      # Generate with: openssl rand -hex 32
+      TENANT_ENCRYPTION_KEY: ${TENANT_ENCRYPTION_KEY}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8081}
     networks:
       - backend_net
       - frontend_net
@@ -79,7 +86,7 @@ services:
         condition: service_healthy
     # Do NOT expose port to the host; only nginx needs it
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT:-5555}/books > /dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT:-5555}/health | grep -q ok || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3

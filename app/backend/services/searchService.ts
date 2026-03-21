@@ -1,6 +1,7 @@
 /**
  * Elasticsearch search service using native fetch() for Bun compatibility.
  * The @elastic/elasticsearch SDK uses Node.js http internals that break on Bun.
+ * All operations are scoped to a tenantId for full data isolation.
  */
 
 import type { BookRow } from '../models/bookModel';
@@ -10,7 +11,7 @@ const INDEX = 'books';
 
 let esAvailable = false;
 
-/** Create / ensure the books index exists */
+/** Create / ensure the books index exists with tenant_id field */
 async function ensureIndex(): Promise<void> {
   try {
     const res = await fetch(`${ELASTIC_URL}/${INDEX}`, { method: 'HEAD' });
@@ -21,6 +22,7 @@ async function ensureIndex(): Promise<void> {
         body: JSON.stringify({
           mappings: {
             properties: {
+              tenant_id:    { type: 'keyword' },
               title:        { type: 'text' },
               author:       { type: 'text' },
               genre:        { type: 'keyword' },
@@ -29,6 +31,7 @@ async function ensureIndex(): Promise<void> {
               isbn:         { type: 'keyword' },
               publish_year: { type: 'integer' },
               language:     { type: 'keyword' },
+              keywords:     { type: 'keyword' },
             },
           },
         }),
@@ -50,6 +53,7 @@ async function indexBook(book: BookRow): Promise<void> {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        tenant_id:    book.tenant_id,
         title:        book.title,
         author:       book.author,
         isbn:         book.isbn,
@@ -58,6 +62,7 @@ async function indexBook(book: BookRow): Promise<void> {
         description:  book.description,
         publish_year: book.publish_year,
         language:     book.language,
+        keywords:     book.keywords ?? [],
       }),
     });
   } catch (err: unknown) {
@@ -76,10 +81,10 @@ async function removeBook(id: string): Promise<void> {
 }
 
 /**
- * Full-text search across title, author, description, publisher.
+ * Full-text search scoped to a tenant.
  * Returns an array of matching book IDs, or null when ES is unavailable.
  */
-async function searchBooks(query: string): Promise<string[] | null> {
+async function searchBooks(query: string, tenantId: string): Promise<string[] | null> {
   if (!esAvailable) return null;
   try {
     const res = await fetch(`${ELASTIC_URL}/${INDEX}/_search`, {
@@ -87,10 +92,17 @@ async function searchBooks(query: string): Promise<string[] | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: {
-          multi_match: {
-            query,
-            fields: ['title^3', 'author^2', 'description', 'publisher', 'genre', 'language^2'],
-            fuzziness: 'AUTO',
+          bool: {
+            must: {
+              multi_match: {
+                query,
+                fields: ['title^3', 'author^2', 'keywords^3', 'description', 'publisher', 'genre', 'language^2'],
+                fuzziness: 'AUTO',
+              },
+            },
+            filter: {
+              term: { tenant_id: tenantId },
+            },
           },
         },
         size: 100,

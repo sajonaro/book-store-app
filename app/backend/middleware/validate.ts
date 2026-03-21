@@ -15,6 +15,7 @@ export interface BookFields {
     shelf_name?: string | null;
     shelf_number?: string | null;
     cover_thumbnail?: string;
+    keywords?: string[] | null;
 }
 
 export function isValidUUID(id: string): boolean {
@@ -41,6 +42,13 @@ export function sanitizeBook(body: Record<string, unknown>): BookFields {
         cover_thumbnail: typeof body.cover_thumbnail === 'string' && body.cover_thumbnail.length > 0
             ? body.cover_thumbnail
             : undefined,
+        // keywords — array of strings; sanitize each tag
+        keywords: Array.isArray(body.keywords)
+            ? (body.keywords as unknown[])
+                .filter((k) => typeof k === 'string' && k.trim().length > 0)
+                .map((k) => (k as string).trim().toLowerCase().slice(0, 50))
+                .slice(0, 30)
+            : null,
     };
 }
 

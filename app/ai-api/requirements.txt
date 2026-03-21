@@ -10,3 +10,9 @@ python-multipart>=0.0.6
 # Barcode detection (ISBN extraction from book photos)
 pyzbar>=0.1.9
 Pillow>=10.0.0
+
+# Database access (fetch per-tenant encryption key)
+psycopg2-binary>=2.9.0
+
+# AES-256-CBC decryption of tenant OpenAI API keys
+pycryptodome>=3.20.0

@@ -6,7 +6,12 @@ import ShowBook from './pages/ShowBook'
 import EditBook from './pages/EditBook'
 import DeleteBook from './pages/DeleteBook'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 import SearchPage from './pages/SearchPage'
+import StorePage from './pages/StorePage'
+import StoreBookDetailPage from './pages/StoreBookDetailPage'
+import TenantSettingsPage from './pages/TenantSettingsPage'
+import SuperuserDashboard from './pages/SuperuserDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 
 const App: React.FC = () => {
@@ -14,24 +19,42 @@ const App: React.FC = () => {
     <Routes>
       {/* Public routes */}
       <Route path='/login' element={<LoginPage />} />
+      <Route path='/register' element={<RegisterPage />} />
+
+      {/* Legacy search page (redirects buyers to use store URLs) */}
       <Route path='/search' element={<SearchPage />} />
+
+      {/* Public tenant-specific buyer catalog */}
+      <Route path='/store/:slug' element={<StorePage />} />
+      <Route path='/store/:slug/books/:id' element={<StoreBookDetailPage />} />
+
+      {/* Superuser dashboard */}
+      <Route path='/superuser' element={<SuperuserDashboard />} />
 
       {/* Redirect root to login */}
       <Route path='/' element={<Navigate to='/login' replace />} />
 
-      {/* Admin-only routes */}
+      {/* Authenticated routes (tenant-admin and user) */}
       <Route
         path='/home'
         element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute>
             <Home />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path='/settings'
+        element={
+          <ProtectedRoute>
+            <TenantSettingsPage />
           </ProtectedRoute>
         }
       />
       <Route
         path='/books/create'
         element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute>
             <CreateBook />
           </ProtectedRoute>
         }
@@ -47,7 +70,7 @@ const App: React.FC = () => {
       <Route
         path='/books/edit/:id'
         element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute>
             <EditBook />
           </ProtectedRoute>
         }
@@ -55,7 +78,7 @@ const App: React.FC = () => {
       <Route
         path='/books/delete/:id'
         element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute>
             <DeleteBook />
           </ProtectedRoute>
         }

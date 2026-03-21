@@ -1,60 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import api from '../utils/api';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import Spinner from '../components/Spinner';
-import BookActionIcons from '../components/shared/BookActionIcons';
 import StockBadge from '../components/shared/StockBadge';
 import { PiBookOpenTextLight } from 'react-icons/pi';
 import { BiUserCircle } from 'react-icons/bi';
-import { useSession } from '../hooks/useSession';
 import { formatPrice } from '../utils/formatters';
 import type { Book } from '../types/book';
 
-const SearchPage: React.FC = () => {
+interface TenantInfo {
+  id: string;
+  store_name: string;
+  slug: string;
+  logo_url?: string | null;
+}
+
+const StorePage: React.FC = () => {
+  const { slug } = useParams<{ slug: string }>();
   const [query, setQuery] = useState('');
   const [books, setBooks] = useState<Book[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
-  const session = useSession();
-  const navigate = useNavigate();
-  const isAdmin = session?.role === 'tenant-admin';
+  const [tenant, setTenant] = useState<TenantInfo | null>(null);
+  const [tenantLoading, setTenantLoading] = useState(true);
 
-  // Fresh tenant branding — always reflects admin's latest edits
-  const [tenantName, setTenantName] = useState(session?.tenant?.store_name || 'Planet of Books');
-  const [tenantLogo, setTenantLogo] = useState<string | null>(session?.tenant?.logo_url || null);
-
-  // Refresh tenant branding from the public endpoint on mount
   useEffect(() => {
-    const slug = session?.tenant?.slug;
     if (!slug) return;
-    axios
-      .get<{ data: { store_name: string; logo_url: string | null } }>(`/tenant/${slug}/info`)
-      .then((res) => {
-        const fresh = res.data.data;
-        setTenantName(fresh.store_name || 'Planet of Books');
-        setTenantLogo(fresh.logo_url || null);
-        // Update localStorage so next page load is up-to-date
-        const stored = JSON.parse(localStorage.getItem('session') || 'null');
-        if (stored?.tenant) {
-          stored.tenant.store_name = fresh.store_name;
-          stored.tenant.logo_url = fresh.logo_url;
-          localStorage.setItem('session', JSON.stringify(stored));
-        }
-      })
-      .catch(() => {/* silently ignore */});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const storeName = tenantName;
+    const fetchTenant = async () => {
+      try {
+        const res = await axios.get<{ data: TenantInfo }>(`/tenant/${slug}/info`);
+        setTenant(res.data.data);
+      } catch {
+        setTenant(null);
+      } finally {
+        setTenantLoading(false);
+      }
+    };
+    fetchTenant();
+  }, [slug]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() || !slug) return;
     setLoading(true);
     setSearched(false);
     try {
-      const res = await api.get<{ data: Book[] }>('/books', { params: { q: query.trim() } });
+      const res = await axios.get<{ data: Book[] }>(`/tenant/${slug}/books`, {
+        params: { q: query.trim() },
+      });
       setBooks(res.data.data || []);
     } catch {
       setBooks([]);
@@ -64,84 +57,42 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const handleSignOut = () => {
-    localStorage.removeItem('session');
-    navigate('/login');
-  };
+  if (tenantLoading) {
+    return (
+      <div className='min-h-screen flex items-center justify-center' style={{ backgroundColor: 'var(--oai-bg)' }}>
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!tenant) {
+    return (
+      <div className='min-h-screen flex flex-col items-center justify-center' style={{ backgroundColor: 'var(--oai-bg)' }}>
+        <div className='text-5xl mb-4'>🔍</div>
+        <h1 className='text-2xl font-semibold mb-2' style={{ color: 'var(--oai-text)' }}>Store not found</h1>
+        <p style={{ color: 'var(--oai-muted)' }}>The store "{slug}" does not exist.</p>
+      </div>
+    );
+  }
 
   return (
     <div className='min-h-screen' style={{ backgroundColor: 'var(--oai-bg)' }}>
-      {/* Top nav */}
-      <header
-        style={{
-          backgroundColor: 'var(--oai-surface)',
-          borderBottom: '1px solid var(--oai-border)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <div className='max-w-7xl mx-auto px-6 h-14 flex items-center justify-between'>
-          <div className='flex items-center gap-3'>
-            <button
-              onClick={() => navigate('/home')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              {tenantLogo ? (
-                <img
-                  src={tenantLogo}
-                  alt='logo'
-                  style={{ height: '24px', objectFit: 'contain' }}
-                />
-              ) : (
-                <img src='/logo.svg' alt='BookStore' style={{ height: '24px', width: 'auto' }} />
-              )}
-              <span className='store-brand-name tracking-tight' style={{ color: 'var(--oai-text)', fontSize: '1.15rem' }}>
-                {storeName}
-              </span>
-            </button>
-          </div>
-          <div className='flex items-center gap-3'>
-            <Link
-              to='/home'
-              className='text-xs font-medium transition-colors'
-              style={{ color: 'var(--oai-muted)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--oai-text)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
-            >
-              ← Inventory
-            </Link>
-            <button
-              onClick={handleSignOut}
-              className='text-xs font-medium transition-colors'
-              style={{ color: 'var(--oai-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--oai-red, #ef4444)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className='flex flex-col items-center pt-16 pb-12 px-4'>
-        {tenantLogo ? (
+      <div className='flex flex-col items-center pt-24 pb-12 px-4'>
+        {tenant.logo_url ? (
           <img
-            src={tenantLogo}
-            alt={`${storeName} logo`}
+            src={tenant.logo_url}
+            alt={`${tenant.store_name} logo`}
             className='mb-4 rounded-lg'
-            style={{ maxHeight: '72px', maxWidth: '180px', objectFit: 'contain' }}
+            style={{ maxHeight: '80px', maxWidth: '200px', objectFit: 'contain' }}
           />
         ) : (
-          <div className='flex justify-center mb-4'>
-            <img src='/logo.svg' alt='BookStore' style={{ height: '80px', width: 'auto' }} />
-          </div>
+          <div className='text-5xl mb-4'>📚</div>
         )}
-        <h1 className='store-brand-name mb-2 tracking-tight' style={{ color: 'var(--oai-text)', fontSize: '3rem', lineHeight: 1.1 }}>
-          {storeName}
+        <h1 className='text-4xl font-semibold mb-2 tracking-tight' style={{ color: 'var(--oai-text)' }}>
+          {tenant.store_name}
         </h1>
         <p className='text-base mb-10' style={{ color: 'var(--oai-muted)' }}>
-          Search across your inventory
+          Find your next great read
         </p>
 
         <form onSubmit={handleSearch} className='w-full max-w-2xl flex items-center gap-2'>
@@ -225,7 +176,9 @@ const SearchPage: React.FC = () => {
                     className='flex justify-end gap-3 mt-3 pt-3'
                     style={{ borderTop: '1px solid var(--oai-border)' }}
                   >
-                    <BookActionIcons bookId={book.id} />
+                    <Link to={`/store/${slug}/books/${book.id}`}>
+                      <span className='text-xs transition-colors' style={{ color: 'var(--oai-green)' }}>View Details</span>
+                    </Link>
                   </div>
                 </div>
               ))}
@@ -237,4 +190,4 @@ const SearchPage: React.FC = () => {
   );
 };
 
-export default SearchPage;
+export default StorePage;

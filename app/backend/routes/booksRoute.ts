@@ -2,8 +2,10 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { BookModel } from '../models/bookModel';
+import { TenantModel } from '../models/tenantModel';
 import { isValidUUID, sanitizeBook, validateBookFields } from '../middleware/validate';
 import { indexBook, removeBook as removeBookFromIndex, searchBooks } from '../services/searchService';
+import { requireAuth } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -27,9 +29,12 @@ const recognizeLimiter = rateLimit({
     message: { msg: 'Too many recognition requests, please try again later.' },
 });
 
+// ── Admin routes (require authentication) ─────────────────────────────────────
+
 // POST /books/recognize — upload one or more book photos → extract metadata via AI
-router.post('/recognize', recognizeLimiter, upload.array('photos', 10), async (req: Request, res: Response) => {
+router.post('/recognize', requireAuth, recognizeLimiter, upload.array('photos', 10), async (req: Request, res: Response) => {
     try {
+        const tenantId = req.tenantId!;
         const files = req.files as Express.Multer.File[] | undefined;
         if (!files || files.length === 0) {
             return res.status(400).json({ msg: 'At least one photo is required (field name: photos)' });
@@ -43,9 +48,19 @@ router.post('/recognize', recognizeLimiter, upload.array('photos', 10), async (r
             form.append('photos', blob, file.originalname || 'photo.jpg');
         }
 
+        // Pass the tenant's encrypted OpenAI key and the tenant ID to the AI service.
+        // The AI service fetches the per-tenant encryption_key from the DB using the tenant ID,
+        // then decrypts the ciphertext locally — plaintext API key never travels over any network link.
+        const tenantRow = await TenantModel.findById(tenantId);
+        const aiHeaders: Record<string, string> = { 'X-Tenant-Id': tenantId };
+        if (tenantRow?.openai_api_key_enc) {
+            aiHeaders['X-OpenAI-Api-Key-Enc'] = tenantRow.openai_api_key_enc;
+        }
+
         const aiRes = await fetch(`${AI_API_URL}/recognize`, {
             method: 'POST',
             body: form,
+            headers: aiHeaders,
         });
 
         if (!aiRes.ok) {
@@ -57,14 +72,14 @@ router.post('/recognize', recognizeLimiter, upload.array('photos', 10), async (r
         const aiData = await aiRes.json() as { data?: Record<string, unknown>; cover_thumbnail?: string };
 
         const meta = (aiData?.data ?? {}) as { isbn?: string; title?: string; author?: string };
-        const existing = await BookModel.findByIdentity({
+        const existing = await BookModel.findByIdentity(tenantId, {
             isbn:   meta.isbn   || null,
             title:  meta.title  || null,
             author: meta.author || null,
         });
 
         if (existing) {
-            const updated = await BookModel.incrementStockAndPatch(existing.id, {
+            const updated = await BookModel.incrementStockAndPatch(existing.id, tenantId, {
                 isbn: meta.isbn || null,
             });
             return res.status(200).json({
@@ -82,15 +97,16 @@ router.post('/recognize', recognizeLimiter, upload.array('photos', 10), async (r
 });
 
 // POST /books — create a new book
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireAuth, async (req: Request, res: Response) => {
     try {
+        const tenantId = req.tenantId!;
         const fields = sanitizeBook(req.body as Record<string, unknown>);
         const validationError = validateBookFields(fields);
         if (validationError) {
             return res.status(400).json({ msg: validationError });
         }
 
-        const book = await BookModel.create(fields as Parameters<typeof BookModel.create>[0]);
+        const book = await BookModel.create(tenantId, fields as Parameters<typeof BookModel.create>[1]);
         await indexBook(book);
         return res.status(201).json({ data: book });
     } catch (error: unknown) {
@@ -99,16 +115,37 @@ router.post('/', async (req: Request, res: Response) => {
     }
 });
 
-// GET /books — list all books, or search via ?q=
-router.get('/', async (req: Request, res: Response) => {
+// GET /books — list all books for this tenant (or ALL books for superusers), or search via ?q=
+router.get('/', requireAuth, async (req: Request, res: Response) => {
     try {
         const { q } = req.query as { q?: string };
 
+        // ── Superuser: cross-tenant view ────────────────────────────────────
+        if (req.isSuperuser) {
+            const allBooks = await BookModel.findAllCrossTenant();
+
+            if (q && q.trim()) {
+                const term = q.trim().toLowerCase();
+                const found = allBooks.filter(
+                    (b) =>
+                        b.title.toLowerCase().includes(term) ||
+                        b.author.toLowerCase().includes(term) ||
+                        b.store_name.toLowerCase().includes(term),
+                );
+                return res.status(200).json({ count: found.length, data: found });
+            }
+
+            return res.status(200).json({ count: allBooks.length, data: allBooks });
+        }
+
+        // ── Tenant admin: scoped to their tenant ────────────────────────────
+        const tenantId = req.tenantId!;
+
         if (q && q.trim()) {
-            const ids = await searchBooks(q.trim());
+            const ids = await searchBooks(q.trim(), tenantId);
 
             if (ids === null) {
-                const books = await BookModel.findAll();
+                const books = await BookModel.findAll(tenantId);
                 const term = q.trim().toLowerCase();
                 const found = books.filter(
                     (b) =>
@@ -122,12 +159,12 @@ router.get('/', async (req: Request, res: Response) => {
                 return res.status(200).json({ count: 0, data: [] });
             }
 
-            const books = await Promise.all(ids.map((id) => BookModel.findById(id)));
+            const books = await Promise.all(ids.map((id) => BookModel.findById(id, tenantId)));
             const found = books.filter(Boolean);
             return res.status(200).json({ count: found.length, data: found });
         }
 
-        const books = await BookModel.findAll();
+        const books = await BookModel.findAll(tenantId);
         return res.status(200).json({ count: books.length, data: books });
     } catch (error: unknown) {
         console.error((error as Error).message);
@@ -136,7 +173,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // GET /books/:id — get a single book
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -144,7 +181,18 @@ router.get('/:id', async (req: Request, res: Response) => {
             return res.status(400).json({ msg: 'Invalid book ID' });
         }
 
-        const book = await BookModel.findById(id);
+        // Superuser: search across all tenants
+        if (req.isSuperuser) {
+            const allBooks = await BookModel.findAllCrossTenant();
+            const book = allBooks.find((b) => b.id === id);
+            if (!book) {
+                return res.status(404).json({ msg: 'Book not found' });
+            }
+            return res.status(200).json({ data: book });
+        }
+
+        const tenantId = req.tenantId!;
+        const book = await BookModel.findById(id, tenantId);
         if (!book) {
             return res.status(404).json({ msg: 'Book not found' });
         }
@@ -157,8 +205,9 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // PUT /books/:id — update a book
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', requireAuth, async (req: Request, res: Response) => {
     try {
+        const tenantId = req.tenantId!;
         const { id } = req.params;
 
         if (!isValidUUID(id)) {
@@ -171,7 +220,7 @@ router.put('/:id', async (req: Request, res: Response) => {
             return res.status(400).json({ msg: validationError });
         }
 
-        const updated = await BookModel.update(id, fields as Parameters<typeof BookModel.update>[1]);
+        const updated = await BookModel.update(id, tenantId, fields as Parameters<typeof BookModel.update>[2]);
         if (!updated) {
             return res.status(404).json({ msg: 'Book not found' });
         }
@@ -185,15 +234,16 @@ router.put('/:id', async (req: Request, res: Response) => {
 });
 
 // DELETE /books/:id — delete a book
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
     try {
+        const tenantId = req.tenantId!;
         const { id } = req.params;
 
         if (!isValidUUID(id)) {
             return res.status(400).json({ msg: 'Invalid book ID' });
         }
 
-        const deleted = await BookModel.remove(id);
+        const deleted = await BookModel.remove(id, tenantId);
         if (!deleted) {
             return res.status(404).json({ msg: 'Book not found' });
         }

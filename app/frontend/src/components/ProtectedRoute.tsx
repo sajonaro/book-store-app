@@ -14,7 +14,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     return <Navigate to='/login' replace />;
   }
 
-  if (adminOnly && session.role !== 'admin') {
+  if (adminOnly && session.role !== 'tenant-admin') {
     return <Navigate to='/search' replace />;
   }
 
