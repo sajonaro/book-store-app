@@ -1,45 +1,96 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import Spinner from '../components/Spinner';
 import { Link } from 'react-router-dom';
 import { MdOutlineAddBox } from 'react-icons/md';
 import BooksCard from '../components/home/BooksCard';
 import BooksTable from '../components/home/BooksTable';
+import type { SortKey, SortDir } from '../components/home/BooksTable';
+import Pagination from '../components/shared/Pagination';
 import type { Book } from '../types/book';
 import api from '../utils/api';
 import DashboardLayout from '../components/DashboardLayout';
 
+const PAGE_LIMIT = 25;
+
+interface PagedResponse {
+  count: number;
+  page: number;
+  limit: number;
+  pages: number;
+  data: Book[];
+}
+
 const Home: React.FC = () => {
   const [books, setBooks] = useState<Book[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showType, setShowType] = useState<'table' | 'card'>('table');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  useEffect(() => {
-    const fetchBooks = async () => {
+  // Debounce filter input so we don't fire a request on every keystroke
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchBooks = useCallback(
+    async (p: number, q: string, sk: SortKey, sd: SortDir) => {
       setLoading(true);
       try {
-        const response = await api.get<{ data: Book[] }>('/books');
-        setBooks(response.data.data);
+        const params: Record<string, string | number> = {
+          page: p,
+          limit: PAGE_LIMIT,
+          sort: sk,
+          order: sd,
+        };
+        if (q.trim()) params.q = q.trim();
+        const res = await api.get<PagedResponse>('/books', { params });
+        setBooks(res.data.data);
+        setTotal(res.data.count);
+        setPage(res.data.page);
+        setPages(res.data.pages);
       } catch (error) {
         console.error(error);
       } finally {
         setLoading(false);
       }
-    };
-    fetchBooks();
+    },
+    [],
+  );
+
+  // Initial load
+  useEffect(() => {
+    fetchBooks(1, '', sortKey, sortDir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Client-side filter by title, author, or genre
-  const filteredBooks = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return books;
-    return books.filter(
-      (b) =>
-        b.title?.toLowerCase().includes(q) ||
-        b.author?.toLowerCase().includes(q) ||
-        b.genre?.toLowerCase().includes(q),
-    );
-  }, [books, searchQuery]);
+  // Re-fetch when sort changes (reset to page 1)
+  const handleSort = (key: SortKey) => {
+    const newDir: SortDir =
+      key === sortKey ? (sortDir === 'asc' ? 'desc' : 'asc') : 'asc';
+    setSortKey(key);
+    setSortDir(newDir);
+    setPage(1);
+    fetchBooks(1, filterQuery, key, newDir);
+  };
+
+  // Re-fetch when page changes
+  const handlePage = (p: number) => {
+    setPage(p);
+    fetchBooks(p, filterQuery, sortKey, sortDir);
+  };
+
+  // Debounced filter input
+  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const q = e.target.value;
+    setFilterQuery(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPage(1);
+      fetchBooks(1, q, sortKey, sortDir);
+    }, 350);
+  };
 
   return (
     <DashboardLayout>
@@ -51,9 +102,9 @@ const Home: React.FC = () => {
               Inventory
             </h2>
             <p className='text-sm mt-0.5' style={{ color: 'var(--oai-muted)' }}>
-              {searchQuery.trim()
-                ? `${filteredBooks.length} of ${books.length} book${books.length !== 1 ? 's' : ''} match`
-                : `${books.length} book${books.length !== 1 ? 's' : ''} in catalog`}
+              {filterQuery.trim()
+                ? `${total} book${total !== 1 ? 's' : ''} match`
+                : `${total} book${total !== 1 ? 's' : ''} in catalog`}
             </p>
           </div>
 
@@ -61,8 +112,8 @@ const Home: React.FC = () => {
             {/* Inline filter */}
             <input
               type='text'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={filterQuery}
+              onChange={handleFilterChange}
               placeholder='Filter by title, author, genre…'
               className='oai-input text-xs'
               style={{ width: '220px', padding: '0.375rem 0.75rem', borderRadius: '9999px' }}
@@ -100,10 +151,23 @@ const Home: React.FC = () => {
         {loading ? (
           <Spinner />
         ) : showType === 'table' ? (
-          <BooksTable books={filteredBooks} />
+          <BooksTable
+            books={books}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
         ) : (
-          <BooksCard books={filteredBooks} />
+          <BooksCard books={books} />
         )}
+
+        <Pagination
+          page={page}
+          pages={pages}
+          total={total}
+          limit={PAGE_LIMIT}
+          onPage={handlePage}
+        />
       </div>
     </DashboardLayout>
   );

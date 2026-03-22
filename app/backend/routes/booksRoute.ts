@@ -115,12 +115,21 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     }
 });
 
-// GET /books — list all books for this tenant (or ALL books for superusers), or search via ?q=
+// GET /books — list books for this tenant.
+//   • When ?page= is present: uses server-side pagination + SQL ILIKE filter (Home inventory view).
+//   • When only ?q= is present (no page): uses Elasticsearch full-text search (SearchPage).
+//   • Superusers always get a cross-tenant listing (no pagination).
 router.get('/', requireAuth, async (req: Request, res: Response) => {
     try {
-        const { q } = req.query as { q?: string };
+        const { q, page, limit, sort, order } = req.query as {
+            q?: string;
+            page?: string;
+            limit?: string;
+            sort?: string;
+            order?: string;
+        };
 
-        // ── Superuser: cross-tenant view ────────────────────────────────────
+        // ── Superuser: cross-tenant view (no pagination) ─────────────────────
         if (req.isSuperuser) {
             const allBooks = await BookModel.findAllCrossTenant();
 
@@ -138,13 +147,39 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
             return res.status(200).json({ count: allBooks.length, data: allBooks });
         }
 
-        // ── Tenant admin: scoped to their tenant ────────────────────────────
+        // ── Tenant admin ─────────────────────────────────────────────────────
         const tenantId = req.tenantId!;
 
+        // Paginated path: triggered when ?page= is present
+        if (page !== undefined) {
+            const pageNum  = Math.max(1, parseInt(page  || '1',  10));
+            const limitNum = Math.min(Math.max(1, parseInt(limit || '25', 10)), 200);
+            const sortCol  = (sort  || 'created_at') as string;
+            const orderDir = (order === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc';
+
+            const { total, rows } = await BookModel.findAllPaginated(tenantId, {
+                page:  pageNum,
+                limit: limitNum,
+                sort:  sortCol,
+                order: orderDir,
+                q:     q?.trim() || undefined,
+            });
+
+            return res.status(200).json({
+                count:  total,
+                page:   pageNum,
+                limit:  limitNum,
+                pages:  Math.ceil(total / limitNum),
+                data:   rows,
+            });
+        }
+
+        // Elasticsearch search path (SearchPage — no page param)
         if (q && q.trim()) {
             const ids = await searchBooks(q.trim(), tenantId);
 
             if (ids === null) {
+                // ES unavailable — fall back to SQL ILIKE
                 const books = await BookModel.findAll(tenantId);
                 const term = q.trim().toLowerCase();
                 const found = books.filter(
@@ -164,6 +199,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
             return res.status(200).json({ count: found.length, data: found });
         }
 
+        // Fallback: return all books (backward-compat, e.g. export endpoint)
         const books = await BookModel.findAll(tenantId);
         return res.status(200).json({ count: books.length, data: books });
     } catch (error: unknown) {

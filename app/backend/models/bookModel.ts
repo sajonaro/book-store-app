@@ -115,6 +115,60 @@ export const BookModel = {
         return result.rows.map(normalizeBook).filter(Boolean) as BookRow[];
     },
 
+    /**
+     * findAllPaginated — scoped to a tenant, supports sort, order, and optional ILIKE filter.
+     * Returns both the total row count and the current page of results.
+     */
+    async findAllPaginated(
+        tenantId: string,
+        opts: {
+            page: number;
+            limit: number;
+            sort: string;
+            order: 'asc' | 'desc';
+            q?: string;
+        }
+    ): Promise<{ total: number; rows: BookRow[] }> {
+        const ALLOWED_SORT = new Set([
+            'title', 'author', 'publish_year', 'genre', 'language',
+            'price', 'stock', 'created_at', 'updated_at',
+        ]);
+        const sortCol = ALLOWED_SORT.has(opts.sort) ? opts.sort : 'created_at';
+        const orderDir = opts.order === 'asc' ? 'ASC' : 'DESC';
+        const limit = Math.min(Math.max(1, opts.limit), 200);
+        const offset = (Math.max(1, opts.page) - 1) * limit;
+
+        const params: unknown[] = [tenantId];
+        let whereExtra = '';
+        if (opts.q && opts.q.trim()) {
+            const term = `%${opts.q.trim()}%`;
+            params.push(term);          // $2
+            whereExtra = ` AND (title ILIKE $2 OR author ILIKE $2 OR genre ILIKE $2)`;
+        }
+
+        const countResult = await pool.query(
+            `SELECT COUNT(*) FROM books WHERE tenant_id = $1${whereExtra}`,
+            params
+        );
+        const total = parseInt(countResult.rows[0].count as string, 10);
+
+        params.push(limit);          // $N-1
+        params.push(offset);         // $N
+        const lp = params.length;
+
+        const rowsResult = await pool.query(
+            `SELECT * FROM books WHERE tenant_id = $1${whereExtra}
+             ORDER BY ${sortCol} ${orderDir} NULLS LAST
+             LIMIT $${lp - 1} OFFSET $${lp}`,
+            params
+        );
+
+        return {
+            total,
+            rows: rowsResult.rows.map(normalizeBook).filter(Boolean) as BookRow[],
+        };
+    },
+
     async findById(id: string, tenantId: string): Promise<BookRow | null> {
         const result = await pool.query(
             'SELECT * FROM books WHERE id = $1 AND tenant_id = $2',

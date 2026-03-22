@@ -4,38 +4,78 @@ import { PLACEHOLDER_TABLE } from '../../utils/constants';
 import { formatPrice, getBookLocation } from '../../utils/formatters';
 import type { Book } from '../../types/book';
 
-interface BooksTableProps {
-  books: Book[];
+export type SortKey = 'title' | 'author' | 'publish_year' | 'genre' | 'language' | 'price' | 'stock' | 'created_at';
+export type SortDir = 'asc' | 'desc';
+
+interface ColDef {
+  label: string;
+  sortKey?: SortKey;
+  thClass?: string;
 }
 
-const BooksTable: React.FC<BooksTableProps> = ({ books }) => {
+const COLUMNS: ColDef[] = [
+  { label: '#',        thClass: 'w-10' },
+  { label: 'Cover',    thClass: 'w-14' },
+  { label: 'Title',    sortKey: 'title' },
+  { label: 'Author',   sortKey: 'author',       thClass: 'max-md:hidden' },
+  { label: 'Year',     sortKey: 'publish_year', thClass: 'max-md:hidden' },
+  { label: 'Genre',    sortKey: 'genre',        thClass: 'max-md:hidden' },
+  { label: 'Language', sortKey: 'language',     thClass: 'max-lg:hidden' },
+  { label: 'Location', thClass: 'max-lg:hidden' },
+  { label: 'Price',    sortKey: 'price',        thClass: 'text-right max-md:hidden' },
+  { label: 'Stock',    sortKey: 'stock',        thClass: 'text-center max-md:hidden' },
+  { label: 'Actions',  thClass: 'text-center' },
+];
+
+interface BooksTableProps {
+  books: Book[];
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (key: SortKey) => void;
+}
+
+const BooksTable: React.FC<BooksTableProps> = ({ books, sortKey, sortDir, onSort }) => {
   return (
     <div
       className='overflow-x-auto rounded-xl'
       style={{ border: '1px solid var(--oai-border)' }}
     >
       <table className='min-w-full text-sm' style={{ backgroundColor: 'var(--oai-surface)' }}>
-        <thead style={{ backgroundColor: 'var(--oai-surface-2)', borderBottom: '1px solid var(--oai-border)' }}>
+        <thead
+          style={{
+            backgroundColor: 'var(--oai-surface-2)',
+            borderBottom: '1px solid var(--oai-border)',
+          }}
+        >
           <tr>
-            {['#', 'Cover', 'Title', 'Author', 'Year', 'Genre', 'Language', 'Location', 'Price', 'Stock', 'Actions'].map(
-              (h, i) => (
+            {COLUMNS.map((col) => {
+              const active = col.sortKey === sortKey;
+              const sortable = !!col.sortKey;
+              return (
                 <th
-                  key={h}
+                  key={col.label}
                   className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider${
-                    i === 0 ? ' w-10' : ''
-                  }${i === 1 ? ' w-14' : ''}${
-                    [3, 4, 5].includes(i) ? ' max-md:hidden' : ''
-                  }${[6, 7].includes(i) ? ' max-lg:hidden' : ''}${
-                    i === 8 ? ' text-right max-md:hidden' : ''
-                  }${i === 9 ? ' text-center max-md:hidden' : ''}${
-                    i === 10 ? ' text-center' : ''
-                  }`}
-                  style={{ color: 'var(--oai-muted)' }}
+                    col.thClass ? ` ${col.thClass}` : ''
+                  }${sortable ? ' select-none' : ''}`}
+                  style={{
+                    color: active ? 'var(--oai-green)' : 'var(--oai-muted)',
+                    cursor: sortable ? 'pointer' : 'default',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onClick={sortable ? () => onSort(col.sortKey!) : undefined}
+                  title={sortable ? `Sort by ${col.label}` : undefined}
                 >
-                  {h}
+                  {col.label}
+                  {sortable && (
+                    <span className='ml-1 inline-block w-3 text-center'>
+                      {active ? (sortDir === 'asc' ? '↑' : '↓') : (
+                        <span style={{ opacity: 0.3 }}>↕</span>
+                      )}
+                    </span>
+                  )}
                 </th>
-              ),
-            )}
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -43,8 +83,12 @@ const BooksTable: React.FC<BooksTableProps> = ({ books }) => {
             <tr
               key={book.id}
               style={{ borderBottom: '1px solid var(--oai-border)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--oai-surface-2)')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = 'var(--oai-surface-2)')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = 'transparent')
+              }
             >
               <td className='px-4 py-3 text-xs' style={{ color: 'var(--oai-subtle)' }}>
                 {index + 1}
@@ -55,7 +99,9 @@ const BooksTable: React.FC<BooksTableProps> = ({ books }) => {
                   alt=''
                   className='w-9 h-12 object-cover rounded'
                   style={{ border: '1px solid var(--oai-border)' }}
-                  onError={(e) => { e.currentTarget.src = PLACEHOLDER_TABLE; }}
+                  onError={(e) => {
+                    e.currentTarget.src = PLACEHOLDER_TABLE;
+                  }}
                 />
               </td>
               <td className='px-4 py-3 font-medium' style={{ color: 'var(--oai-text)' }}>
@@ -81,10 +127,16 @@ const BooksTable: React.FC<BooksTableProps> = ({ books }) => {
                   <span style={{ color: 'var(--oai-subtle)' }}>—</span>
                 )}
               </td>
-              <td className='px-4 py-3 text-xs max-lg:hidden' style={{ color: 'var(--oai-subtle)' }}>
+              <td
+                className='px-4 py-3 text-xs max-lg:hidden'
+                style={{ color: 'var(--oai-subtle)' }}
+              >
                 {getBookLocation(book) || '—'}
               </td>
-              <td className='px-4 py-3 text-right font-semibold max-md:hidden' style={{ color: 'var(--oai-text)' }}>
+              <td
+                className='px-4 py-3 text-right font-semibold max-md:hidden'
+                style={{ color: 'var(--oai-text)' }}
+              >
                 {formatPrice(book.price)}
               </td>
               <td className='px-4 py-3 text-center max-md:hidden'>
