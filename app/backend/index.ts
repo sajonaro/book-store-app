@@ -4,7 +4,6 @@ import tenantRoute from './routes/tenantRoute';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import { initIndex } from './services/searchService';
 import authRoute from './routes/authRoute';
 import superuserRoute from './routes/superuserRoute';

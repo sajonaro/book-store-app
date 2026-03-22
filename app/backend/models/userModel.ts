@@ -21,15 +21,6 @@ export interface UserRow {
   created_at?: Date;
 }
 
-/** Find a tenant admin by email + tenantId */
-async function findByEmail(email: string, tenantId: string): Promise<UserRow | null> {
-  const result = await pool.query(
-    'SELECT * FROM users WHERE email = $1 AND tenant_id = $2',
-    [email, tenantId],
-  );
-  return result.rows[0] || null;
-}
-
 /**
  * Find any user (tenant admin or superuser) by email globally.
  * Used for slug-free login: one email is unique across the entire system.
@@ -52,15 +43,6 @@ async function emailExists(email: string): Promise<boolean> {
     [email],
   );
   return (result.rowCount ?? 0) > 0;
-}
-
-/** Find a superuser by email (tenant_id IS NULL) */
-async function findSuperuserByEmail(email: string): Promise<UserRow | null> {
-  const result = await pool.query(
-    'SELECT * FROM users WHERE email = $1 AND tenant_id IS NULL AND role = $2',
-    [email, 'superuser'],
-  );
-  return result.rows[0] || null;
 }
 
 /** Create a tenant user. Default role is 'tenant-admin'. */
@@ -158,10 +140,8 @@ async function findAdminsByTenantId(tenantId: string): Promise<UserRow[]> {
 }
 
 export const UserModel = {
-  findByEmail,
   findByEmailGlobal,
   emailExists,
-  findSuperuserByEmail,
   create,
   createSuperuser,
   superuserExists,

@@ -116,7 +116,7 @@ const CreateBooks: React.FC = () => {
                     🤖 Extract Metadata
                   </button>
                   <p className='text-xs' style={{ color: 'var(--oai-muted)', textAlign: 'center' }}>
-                    <Link to='/home/settings' style={{ color: 'var(--oai-green)' }}>Add an OpenAI key</Link> to enable AI scan
+                    <Link to='/settings' style={{ color: 'var(--oai-green)' }}>Add an OpenAI key</Link> to enable AI scan
                   </p>
                 </div>
               )}

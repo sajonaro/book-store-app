@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useSnackbar } from 'notistack';
+import AuthCard from '../components/shared/AuthCard';
 
 interface LoginResponse {
   token: string;
@@ -45,9 +46,10 @@ const LoginPage: React.FC = () => {
         }),
       );
 
-      const greeting = res.data.role === 'superuser'
-        ? `Welcome, ${res.data.user.name}! (System Admin)`
-        : `Welcome, ${res.data.user.name}!`;
+      const greeting =
+        res.data.role === 'superuser'
+          ? `Welcome, ${res.data.user.name}! (System Admin)`
+          : `Welcome, ${res.data.user.name}!`;
       enqueueSnackbar(greeting, { variant: 'success' });
       navigate(res.data.role === 'superuser' ? '/superuser' : '/home');
     } catch (err: unknown) {
@@ -61,87 +63,45 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div
-      className='min-h-screen flex items-center justify-center px-4'
-      style={{ backgroundColor: 'var(--oai-bg)' }}
-    >
-      <div
-        className='w-full max-w-sm animate-fade-in'
-        style={{
-          backgroundColor: 'var(--oai-surface)',
-          border: '1px solid var(--oai-border)',
-          borderRadius: 'var(--oai-radius-xl)',
-          padding: '2.5rem 2rem',
-        }}
-      >
-        {/* Logo / title */}
-        <div className='text-center mb-8'>
-          <div className='flex justify-center mb-3'>
-            <img src='/logo.svg' alt='Planet of Books' style={{ height: '64px', width: 'auto' }} />
-          </div>
-          <h1 className='store-brand-name' style={{ color: 'var(--oai-text)', fontSize: '2rem' }}>
-            Planet of Books
-          </h1>
-          <p className='text-sm mt-1' style={{ color: 'var(--oai-muted)' }}>
-            Sign In
-          </p>
+    <AuthCard subtitle='Sign In'>
+      <form onSubmit={handleLogin} className='space-y-4'>
+        <div>
+          <label className='oai-label'>Email</label>
+          <input
+            type='email'
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder='admin@yourstore.com'
+            className='oai-input'
+          />
         </div>
-
-        <form onSubmit={handleLogin} className='space-y-4'>
-          <div>
-            <label className='oai-label'>Email</label>
-            <input
-              type='email'
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder='admin@yourstore.com'
-              className='oai-input'
-            />
-          </div>
-          <div>
-            <label className='oai-label'>Password</label>
-            <input
-              type='password'
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder='••••••••'
-              className='oai-input'
-            />
-          </div>
-          <button
-            type='submit'
-            disabled={loading}
-            className='btn-primary w-full mt-2'
-            style={{ padding: '0.625rem 1rem' }}
-          >
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
-
-        {/* Register link */}
-        <div className='mt-5 text-center text-sm' style={{ color: 'var(--oai-muted)' }}>
-          New store owner?{' '}
-          <Link
-            to='/register'
-            className='font-medium'
-            style={{ color: 'var(--oai-green)' }}
-          >
-            Register your store →
-          </Link>
+        <div>
+          <label className='oai-label'>Password</label>
+          <input
+            type='password'
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder='••••••••'
+            className='oai-input'
+          />
         </div>
-
-        {/* Footer */}
-        <div
-          className='mt-6 pt-5 text-center text-xs'
-          style={{
-            borderTop: '1px solid var(--oai-border)',
-            color: 'var(--oai-subtle)',
-          }}
+        <button
+          type='submit'
+          disabled={loading}
+          className='btn-primary w-full mt-2'
+          style={{ padding: '0.625rem 1rem' }}
         >
-          Planet of Books © {new Date().getFullYear()}
-        </div>
+          {loading ? 'Signing in…' : 'Sign In'}
+        </button>
+      </form>
+
+      <div className='mt-5 text-center text-sm' style={{ color: 'var(--oai-muted)' }}>
+        New store owner?{' '}
+        <Link to='/register' className='font-medium' style={{ color: 'var(--oai-green)' }}>
+          Register your store →
+        </Link>
       </div>
-    </div>
+    </AuthCard>
   );
 };
 

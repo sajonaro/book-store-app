@@ -1,0 +1,39 @@
+# ── E2E test service overlay ───────────────────────────────────────────────────
+#
+# Usage (from the REPO ROOT):
+#
+#   # Start the full stack first (if not already running):
+#   docker compose -f app/docker-compose.yml up -d
+#
+#   # Run e2e tests against the live stack:
+#   docker compose -f app/docker-compose.yml \
+#                  -f tests/docker-compose.e2e.yml \
+#                  run --rm e2e
+#
+# The service exits with pytest's exit code, so CI can use it directly.
+#
+# NOTE: when using multiple -f flags, Docker Compose resolves relative paths
+# relative to the working directory (repo root), NOT each file's own directory.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  e2e:
+    build:
+      # Paths are resolved relative to the project dir (app/), so ../tests = repo-root tests/
+      context: ../tests
+      dockerfile: Dockerfile.e2e
+    image: bookstore-e2e
+    # Join the frontend_net so the test runner can reach nginx
+    networks:
+      - frontend_net
+    # Inherit superuser credentials from the stack's .env file
+    # env_file paths are resolved relative to the project dir (app/), so .env = app/.env
+    env_file: .env
+    environment:
+      BASE_URL: http://nginx
+      SUPERUSER_EMAIL: ${SUPERUSER_EMAIL:-z@zed.com}
+      SUPERUSER_PWD: ${SUPERUSER_PWD:-zed}
+    depends_on:
+      - nginx
+    # Never restart — one-shot runner
+    restart: "no"

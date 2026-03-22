@@ -1,5 +1,4 @@
 import express, { Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
 import { requireAuth } from '../middleware/auth';
 import { TenantModel } from '../models/tenantModel';
 import { UserModel } from '../models/userModel';
@@ -106,9 +105,7 @@ router.put(
         return res.status(404).json({ msg: 'Tenant admin not found for this tenant' });
       }
 
-      const hash = await bcrypt.hash(new_password, 12);
       const updated = await UserModel.updateProfile(userId, { password: new_password });
-      void hash; // updateProfile handles the hashing internally
       if (!updated) {
         return res.status(500).json({ msg: 'Failed to update password' });
       }

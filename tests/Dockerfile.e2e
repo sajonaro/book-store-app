@@ -1,0 +1,45 @@
+# ── E2E / Integration-test runner ─────────────────────────────────────────────
+#
+# Runs tests/test_api.py against the live stack.
+# The container is attached to the same Docker network as nginx so it can
+# reach the API via http://nginx (the default BASE_URL).
+#
+# Build:
+#   docker build -f tests/Dockerfile.e2e -t bookstore-e2e tests/
+#
+# Run (stack must already be up):
+#   docker run --rm \
+#     --network app_frontend_net \
+#     -e SUPERUSER_PWD=changeme_strong_password_here \
+#     bookstore-e2e
+#
+# Or, via docker compose (from the app/ directory):
+#   docker compose -f docker-compose.yml \
+#                  -f docker-compose.e2e.yml \
+#                  run --rm e2e
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM python:3.12-slim
+
+# Install test dependencies (no build tools needed — pure Python)
+RUN pip install --no-cache-dir pytest==8.3.5 requests==2.32.3
+
+WORKDIR /tests
+
+COPY test_api.py .
+
+# ── Runtime environment ───────────────────────────────────────────────────────
+# BASE_URL points to nginx inside the Docker network.
+# Override all three vars at `docker run` time if needed.
+ENV BASE_URL=http://nginx \
+    SUPERUSER_EMAIL=z@zed.com \
+    SUPERUSER_PWD=changeme_strong_password_here
+
+# Exit code mirrors pytest's exit code:
+#   0  all tests passed
+#   1  some tests failed
+#   2  test execution was interrupted
+#   3  internal error
+#   4  command-line usage error
+#   5  no tests collected
+CMD ["pytest", "test_api.py", "-v", "--tb=short", "--no-header"]

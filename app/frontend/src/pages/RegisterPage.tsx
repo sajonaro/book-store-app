@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useSnackbar } from 'notistack';
+import AuthCard from '../components/shared/AuthCard';
 
 const RegisterPage: React.FC = () => {
   const [storeName, setStoreName] = useState('');
@@ -69,119 +70,77 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div
-      className='min-h-screen flex items-center justify-center px-4 py-12'
-      style={{ backgroundColor: 'var(--oai-bg)' }}
-    >
-      <div
-        className='w-full max-w-sm animate-fade-in'
-        style={{
-          backgroundColor: 'var(--oai-surface)',
-          border: '1px solid var(--oai-border)',
-          borderRadius: 'var(--oai-radius-xl)',
-          padding: '2.5rem 2rem',
-        }}
-      >
-        {/* Logo / title */}
-        <div className='text-center mb-8'>
-          <div className='flex justify-center mb-3'>
-            <img src='/logo.svg' alt='Planet of Books' style={{ height: '64px', width: 'auto' }} />
-          </div>
-          <h1 className='store-brand-name' style={{ color: 'var(--oai-text)', fontSize: '2rem' }}>
-            Planet of Books
-          </h1>
-          <p className='text-sm mt-1' style={{ color: 'var(--oai-muted)' }}>
-            Register Your Store
-          </p>
+    <AuthCard subtitle='Register Your Store'>
+      <form onSubmit={handleRegister} className='space-y-4'>
+        <div>
+          <label className='oai-label'>
+            Store Name <span style={{ color: '#ef4444' }}>*</span>
+          </label>
+          <input
+            type='text'
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            placeholder='My Awesome Book Store'
+            className='oai-input'
+            required
+          />
         </div>
-
-        <form onSubmit={handleRegister} className='space-y-4'>
-          <div>
-            <label className='oai-label'>
-              Store Name <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <input
-              type='text'
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              placeholder='My Awesome Book Store'
-              className='oai-input'
-              required
-            />
-          </div>
-          <div>
-            <label className='oai-label'>
-              Your Name <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <input
-              type='text'
-              value={adminName}
-              onChange={(e) => setAdminName(e.target.value)}
-              placeholder='Jane Smith'
-              className='oai-input'
-              required
-            />
-          </div>
-          <div>
-            <label className='oai-label'>
-              Email <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <input
-              type='email'
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder='jane@mystore.com'
-              className='oai-input'
-              required
-            />
-          </div>
-          <div>
-            <label className='oai-label'>
-              Password <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <input
-              type='password'
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder='Min. 8 characters'
-              className='oai-input'
-              required
-            />
-          </div>
-          <button
-            type='submit'
-            disabled={loading}
-            className='btn-primary w-full mt-2'
-            style={{ padding: '0.625rem 1rem' }}
-          >
-            {loading ? 'Creating store…' : 'Create Store & Sign In'}
-          </button>
-        </form>
-
-        {/* Login link */}
-        <div className='mt-5 text-center text-sm' style={{ color: 'var(--oai-muted)' }}>
-          Already have a store?{' '}
-          <Link
-            to='/login'
-            className='font-medium'
-            style={{ color: 'var(--oai-green)' }}
-          >
-            Sign in →
-          </Link>
+        <div>
+          <label className='oai-label'>
+            Your Name <span style={{ color: '#ef4444' }}>*</span>
+          </label>
+          <input
+            type='text'
+            value={adminName}
+            onChange={(e) => setAdminName(e.target.value)}
+            placeholder='Jane Smith'
+            className='oai-input'
+            required
+          />
         </div>
-
-        {/* Divider line */}
-        <div
-          className='mt-6 pt-5 text-center text-xs'
-          style={{
-            borderTop: '1px solid var(--oai-border)',
-            color: 'var(--oai-subtle)',
-          }}
+        <div>
+          <label className='oai-label'>
+            Email <span style={{ color: '#ef4444' }}>*</span>
+          </label>
+          <input
+            type='email'
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder='jane@mystore.com'
+            className='oai-input'
+            required
+          />
+        </div>
+        <div>
+          <label className='oai-label'>
+            Password <span style={{ color: '#ef4444' }}>*</span>
+          </label>
+          <input
+            type='password'
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder='Min. 8 characters'
+            className='oai-input'
+            required
+          />
+        </div>
+        <button
+          type='submit'
+          disabled={loading}
+          className='btn-primary w-full mt-2'
+          style={{ padding: '0.625rem 1rem' }}
         >
-          Planet of Books © {new Date().getFullYear()}
-        </div>
+          {loading ? 'Creating store…' : 'Create Store & Sign In'}
+        </button>
+      </form>
+
+      <div className='mt-5 text-center text-sm' style={{ color: 'var(--oai-muted)' }}>
+        Already have a store?{' '}
+        <Link to='/login' className='font-medium' style={{ color: 'var(--oai-green)' }}>
+          Sign in →
+        </Link>
       </div>
-    </div>
+    </AuthCard>
   );
 };
 

@@ -2,10 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import Spinner from '../components/Spinner';
-import StockBadge from '../components/shared/StockBadge';
-import { PiBookOpenTextLight } from 'react-icons/pi';
-import { BiUserCircle } from 'react-icons/bi';
-import { formatPrice } from '../utils/formatters';
+import BookCard from '../components/shared/BookCard';
 import type { Book } from '../types/book';
 
 interface TenantInfo {
@@ -70,7 +67,7 @@ const StorePage: React.FC = () => {
       <div className='min-h-screen flex flex-col items-center justify-center' style={{ backgroundColor: 'var(--oai-bg)' }}>
         <div className='text-5xl mb-4'>🔍</div>
         <h1 className='text-2xl font-semibold mb-2' style={{ color: 'var(--oai-text)' }}>Store not found</h1>
-        <p style={{ color: 'var(--oai-muted)' }}>The store "{slug}" does not exist.</p>
+        <p style={{ color: 'var(--oai-muted)' }}>The store &ldquo;{slug}&rdquo; does not exist.</p>
       </div>
     );
   }
@@ -141,46 +138,17 @@ const StorePage: React.FC = () => {
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
               {books.map((book) => (
-                <div
+                <BookCard
                   key={book.id}
-                  className='oai-card p-4 transition-all duration-150 animate-fade-in'
-                  style={{ cursor: 'default' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--oai-border-2)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--oai-border)')}
-                >
-                  <div className='flex items-center gap-2 mb-1'>
-                    <PiBookOpenTextLight style={{ color: 'var(--oai-green)', fontSize: '1.2rem', flexShrink: 0 }} />
-                    <h2 className='font-medium truncate text-sm' style={{ color: 'var(--oai-text)' }}>
-                      {book.title}
-                    </h2>
-                  </div>
-                  <div className='flex items-center gap-2 mb-3'>
-                    <BiUserCircle style={{ color: 'var(--oai-muted)', fontSize: '1.1rem', flexShrink: 0 }} />
-                    <span className='text-sm truncate' style={{ color: 'var(--oai-muted)' }}>
-                      {book.author}
-                    </span>
-                  </div>
-                  {book.genre && (
-                    <span className='badge-blue mb-3 inline-block'>{book.genre}</span>
-                  )}
-                  <div
-                    className='flex justify-between items-center mt-3 pt-3'
-                    style={{ borderTop: '1px solid var(--oai-border)' }}
-                  >
-                    <span className='font-semibold text-sm' style={{ color: 'var(--oai-text)' }}>
-                      {formatPrice(book.price)}
-                    </span>
-                    <StockBadge stock={book.stock} />
-                  </div>
-                  <div
-                    className='flex justify-end gap-3 mt-3 pt-3'
-                    style={{ borderTop: '1px solid var(--oai-border)' }}
-                  >
+                  book={book}
+                  actions={
                     <Link to={`/store/${slug}/books/${book.id}`}>
-                      <span className='text-xs transition-colors' style={{ color: 'var(--oai-green)' }}>View Details</span>
+                      <span className='text-xs transition-colors' style={{ color: 'var(--oai-green)' }}>
+                        View Details
+                      </span>
                     </Link>
-                  </div>
-                </div>
+                  }
+                />
               ))}
             </div>
           </>

@@ -20,15 +20,3 @@ export function useSession(): Session | null {
     return null;
   }
 }
-
-export function getAuthHeader(): Record<string, string> {
-  try {
-    const session = JSON.parse(localStorage.getItem('session') || 'null') as Session | null;
-    if (session?.token) {
-      return { Authorization: `Bearer ${session.token}` };
-    }
-  } catch {
-    // ignore
-  }
-  return {};
-}

@@ -225,5 +225,3 @@ export const TenantModel = {
     return (result.rowCount ?? 0) > 0;
   },
 };
-
-export { pool as tenantPool };

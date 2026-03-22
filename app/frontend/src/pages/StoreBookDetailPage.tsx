@@ -2,33 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import Spinner from '../components/Spinner';
+import BookDetailHero from '../components/shared/BookDetailHero';
+import InfoRow from '../components/shared/InfoRow';
+import { formatPrice } from '../utils/formatters';
 import type { Book } from '../types/book';
-
-const PLACEHOLDER =
-  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="280" viewBox="0 0 200 280"><rect width="200" height="280" fill="%231c1c1c"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="60" fill="%23666680">📚</text></svg>';
-
-interface InfoRowProps {
-  label: string;
-  value?: string | number | null;
-}
-
-const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
-  value != null && value !== '' ? (
-    <div
-      className='flex flex-col sm:flex-row sm:gap-4 py-3'
-      style={{ borderBottom: '1px solid var(--oai-border)' }}
-    >
-      <span
-        className='text-xs font-medium uppercase tracking-wider sm:w-36 flex-shrink-0'
-        style={{ color: 'var(--oai-muted)' }}
-      >
-        {label}
-      </span>
-      <span className='text-sm mt-0.5 sm:mt-0' style={{ color: 'var(--oai-text)' }}>
-        {value}
-      </span>
-    </div>
-  ) : null;
 
 /**
  * Public book detail page for buyer-facing store catalog.
@@ -57,8 +34,6 @@ const StoreBookDetailPage: React.FC = () => {
     };
     fetchData();
   }, [slug, id]);
-
-  const thumb = book.cover_thumbnail || PLACEHOLDER;
 
   if (loading) {
     return (
@@ -113,56 +88,7 @@ const StoreBookDetailPage: React.FC = () => {
             border: '1px solid var(--oai-border)',
           }}
         >
-          {/* Cover + header info */}
-          <div className='flex gap-0'>
-            <div
-              className='w-36 flex-shrink-0'
-              style={{ backgroundColor: 'var(--oai-surface-2)' }}
-            >
-              <img
-                src={thumb}
-                alt={`Cover of ${book.title}`}
-                className='w-full h-full object-cover min-h-48'
-                onError={(e) => {
-                  e.currentTarget.src = PLACEHOLDER;
-                }}
-              />
-            </div>
-            <div className='p-6 flex-1 flex flex-col justify-between min-w-0'>
-              <div>
-                <h2
-                  className='text-xl font-semibold truncate'
-                  style={{ color: 'var(--oai-text)' }}
-                >
-                  {book.title}
-                </h2>
-                <p className='text-sm mt-1' style={{ color: 'var(--oai-muted)' }}>
-                  {book.author}
-                </p>
-                <div className='flex flex-wrap gap-2 mt-3'>
-                  {book.genre && <span className='badge-blue'>{book.genre}</span>}
-                  {book.language && (
-                    <span className='badge-purple'>🌐 {book.language}</span>
-                  )}
-                </div>
-              </div>
-              <div className='mt-4'>
-                <p
-                  className='text-2xl font-semibold'
-                  style={{ color: 'var(--oai-green)' }}
-                >
-                  ${parseFloat(String(book.price || 0)).toFixed(2)}
-                </p>
-                <div className='mt-1'>
-                  {(book.stock ?? 0) > 0 ? (
-                    <span className='badge-green'>{book.stock} in stock</span>
-                  ) : (
-                    <span className='badge-red'>Out of stock</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <BookDetailHero book={book} />
 
           {/* Details */}
           <div className='px-6 pb-6'>
@@ -182,7 +108,7 @@ const StoreBookDetailPage: React.FC = () => {
               <InfoRow label='Genre' value={book.genre} />
               <InfoRow label='Shelf Name' value={book.shelf_name} />
               <InfoRow label='Shelf Number' value={book.shelf_number} />
-              <InfoRow label='Price' value={book.price != null ? `$${parseFloat(String(book.price)).toFixed(2)}` : null} />
+              <InfoRow label='Price' value={book.price != null ? formatPrice(book.price) : null} />
               <InfoRow label='Stock' value={book.stock != null ? `${book.stock} in stock` : null} />
             </div>
 

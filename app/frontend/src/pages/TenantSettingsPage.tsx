@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import api from '../utils/api';
-import { useSession, getAuthHeader } from '../hooks/useSession';
+import { useSession } from '../hooks/useSession';
 import Spinner from '../components/Spinner';
 import DashboardLayout from '../components/DashboardLayout';
+import PwdInput from '../components/shared/PwdInput';
 
 interface QRCodeData {
   catalog_url: string;
@@ -55,21 +56,6 @@ interface TenantUser {
   created_at?: string;
 }
 
-/** Eye icon for show/hide password toggle */
-const EyeIcon = ({ open }: { open: boolean }) =>
-  open ? (
-    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' className='w-4 h-4'>
-      <path d='M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94' />
-      <path d='M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19' />
-      <line x1='1' y1='1' x2='23' y2='23' />
-    </svg>
-  ) : (
-    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' className='w-4 h-4'>
-      <path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' />
-      <circle cx='12' cy='12' r='3' />
-    </svg>
-  );
-
 /** Chevron icon for collapse toggle */
 const ChevronIcon = ({ open }: { open: boolean }) => (
   <svg
@@ -117,44 +103,6 @@ const Section = ({
         </span>
       </button>
       {open && <div className='px-6 py-5'>{children}</div>}
-    </div>
-  );
-};
-
-/** Password input with show/hide toggle */
-const PwdInput = ({
-  value,
-  onChange,
-  placeholder,
-  required,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  required?: boolean;
-}) => {
-  const [show, setShow] = useState(false);
-  return (
-    <div className='relative'>
-      <input
-        type={show ? 'text' : 'password'}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        required={required}
-        className='oai-input pr-10'
-        style={{ width: '100%' }}
-      />
-      <button
-        type='button'
-        onClick={() => setShow((s) => !s)}
-        className='absolute right-3 top-1/2 -translate-y-1/2'
-        style={{ color: 'var(--oai-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-        tabIndex={-1}
-        aria-label={show ? 'Hide password' : 'Show password'}
-      >
-        <EyeIcon open={show} />
-      </button>
     </div>
   );
 };
@@ -405,16 +353,12 @@ const TenantSettingsPage: React.FC = () => {
   const handleExport = async () => {
     setExportLoading(true);
     try {
-      const response = await fetch(`/tenant/export?format=${exportFormat}`, {
-        headers: { ...getAuthHeader() },
+      const response = await api.get('/tenant/export', {
+        params: { format: exportFormat },
+        responseType: 'blob',
       });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ msg: 'Export failed' }));
-        enqueueSnackbar((err as { msg?: string }).msg || 'Export failed', { variant: 'error' });
-        return;
-      }
-      const blob = await response.blob();
-      const contentDisposition = response.headers.get('Content-Disposition') || '';
+      const blob: Blob = response.data;
+      const contentDisposition = (response.headers['content-disposition'] as string) || '';
       const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
       const filename = filenameMatch ? filenameMatch[1] : `catalog-export.${exportFormat}`;
       const url = URL.createObjectURL(blob);
