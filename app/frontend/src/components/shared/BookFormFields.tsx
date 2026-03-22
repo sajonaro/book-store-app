@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { BookFormState } from '../../hooks/useBookForm';
 
 interface FieldProps {
@@ -119,6 +119,210 @@ const KeywordsInput: React.FC<KeywordsInputProps> = ({ keywords, onChange }) => 
   );
 };
 
+/** Year picker — shows a scrollable grid of years in a popup */
+interface YearPickerProps {
+  value: string;
+  onChange: (year: string) => void;
+}
+
+const CURRENT_YEAR = new Date().getFullYear();
+const MIN_YEAR = 700;
+
+const YearPicker: React.FC<YearPickerProps> = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [typedValue, setTypedValue] = useState(value);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep typedValue in sync when value changes externally
+  useEffect(() => {
+    setTypedValue(value);
+  }, [value]);
+
+  // Generate years from current down to MIN_YEAR
+  const years: number[] = [];
+  for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--) years.push(y);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Scroll selected year into view when popup opens
+  useEffect(() => {
+    if (open) {
+      if (selectedRef.current) {
+        selectedRef.current.scrollIntoView({ block: 'center' });
+      }
+      // Focus the text input so user can type immediately
+      setTimeout(() => inputRef.current?.focus(), 30);
+    }
+  }, [open]);
+
+  const handleSelect = (y: number) => {
+    onChange(String(y));
+    setTypedValue(String(y));
+    setOpen(false);
+  };
+
+  const handleTyped = (raw: string) => {
+    // Allow only digits, max 4
+    const digits = raw.replace(/\D/g, '').slice(0, 4);
+    setTypedValue(digits);
+    if (digits.length === 4) {
+      const y = parseInt(digits, 10);
+      if (y >= MIN_YEAR && y <= CURRENT_YEAR) {
+        onChange(digits);
+      }
+    }
+  };
+
+  const commitTyped = () => {
+    if (typedValue.length === 4) {
+      const y = parseInt(typedValue, 10);
+      if (y >= MIN_YEAR && y <= CURRENT_YEAR) {
+        onChange(typedValue);
+        setOpen(false);
+        return;
+      }
+    }
+    // Invalid — revert
+    setTypedValue(value);
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      {/* Trigger */}
+      <button
+        type="button"
+        className="oai-input"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          textAlign: 'left',
+          width: '100%',
+        }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span style={{ color: value ? 'var(--oai-text)' : 'var(--oai-muted)' }}>
+          {value || 'Select year…'}
+        </span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          width="14"
+          height="14"
+          style={{ color: 'var(--oai-muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            zIndex: 200,
+            backgroundColor: 'var(--oai-surface)',
+            border: '1px solid var(--oai-border)',
+            borderRadius: 'var(--oai-radius)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            padding: '8px 6px 6px',
+          }}
+        >
+          {/* Type-in field */}
+          <div style={{ marginBottom: '6px', padding: '0 2px' }}>
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="Type year (e.g. 1984)"
+              value={typedValue}
+              onChange={(e) => handleTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commitTyped(); }
+                if (e.key === 'Escape') { setOpen(false); setTypedValue(value); }
+              }}
+              onBlur={commitTyped}
+              style={{
+                width: '100%',
+                padding: '5px 8px',
+                fontSize: '0.85rem',
+                backgroundColor: 'var(--oai-bg)',
+                border: '1px solid var(--oai-border)',
+                borderRadius: '4px',
+                color: 'var(--oai-text)',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Scrollable year grid */}
+          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '3px',
+              }}
+            >
+              {years.map((y) => {
+                const isSelected = String(y) === value;
+                return (
+                  <button
+                    key={y}
+                    ref={isSelected ? selectedRef : undefined}
+                    type="button"
+                    onClick={() => handleSelect(y)}
+                    style={{
+                      padding: '5px 2px',
+                      fontSize: '0.78rem',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: isSelected ? 700 : 400,
+                      backgroundColor: isSelected ? 'var(--oai-green)' : 'transparent',
+                      color: isSelected ? '#fff' : 'var(--oai-text)',
+                      transition: 'background-color 0.1s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--oai-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    {y}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface BookFormFieldsProps {
   form: BookFormState;
   set: <K extends keyof BookFormState>(key: K, value: BookFormState[K]) => void;
@@ -139,7 +343,7 @@ const BookFormFields: React.FC<BookFormFieldsProps> = ({ form, set }) => (
       <input type='text' value={form.publisher} onChange={(e) => set('publisher', e.target.value)} className='oai-input' />
     </Field>
     <Field label='Publish Year'>
-      <input type='number' value={form.publishYear} onChange={(e) => set('publishYear', e.target.value)} className='oai-input' />
+      <YearPicker value={form.publishYear} onChange={(y) => set('publishYear', y)} />
     </Field>
     <Field label='Genre'>
       <input type='text' value={form.genre} onChange={(e) => set('genre', e.target.value)} className='oai-input' />

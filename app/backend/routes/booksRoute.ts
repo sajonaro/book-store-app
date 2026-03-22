@@ -248,7 +248,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
             return res.status(404).json({ msg: 'Book not found' });
         }
 
-        await removeBookFromIndex(id);
+        await removeBookFromIndex(id, tenantId);
         return res.status(200).json({ msg: 'Book deleted successfully' });
     } catch (error: unknown) {
         console.error((error as Error).message);

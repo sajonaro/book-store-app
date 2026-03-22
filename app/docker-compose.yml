@@ -35,6 +35,42 @@ services:
       retries: 5
       start_period: 60s
 
+  kibana:
+    image: kibana:8.13.0
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elastic:9200
+    volumes:
+      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - ./kibana:/kibana:ro
+    networks:
+      - backend_net
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    depends_on:
+      elastic:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status | grep -q 'available'"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  kibana-init:
+    image: curlimages/curl:8.7.1
+    restart: "no"
+    volumes:
+      - ./kibana:/kibana:ro
+    environment:
+      - KIBANA_URL=http://kibana:5601
+    networks:
+      - backend_net
+    depends_on:
+      kibana:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/kibana/init-kibana.sh"]
+
   ai-api:
     build:
       context: ./ai-api
@@ -70,9 +106,6 @@ services:
       ELASTIC_URL: http://elastic:9200
       AI_API_URL: http://ai-api:8000
       ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-8081}
-      # Tenant encryption key — must be set in .env as a 64-char hex string
-      # Generate with: openssl rand -hex 32
-      TENANT_ENCRYPTION_KEY: ${TENANT_ENCRYPTION_KEY}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8081}
     networks:
       - backend_net

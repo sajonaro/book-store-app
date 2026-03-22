@@ -217,9 +217,36 @@ CREATE UNIQUE INDEX IF NOT EXISTS books_tenant_title_author_hash_idx
 CREATE INDEX IF NOT EXISTS books_tenant_id_idx ON books (tenant_id);
 
 -- -----------------------------------------------------------------------------
+-- tenant_search_config
+-- Stores per-tenant Elasticsearch indexing configuration.
+-- Each field_name corresponds to a book property that can be toggled on/off.
+-- By default, ALL fields are enabled (created with all fields = true on first
+-- access via the application layer's upsert logic).
+-- The 'keywords' field controls indexing of the book's keyword tags array.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tenant_search_config (
+    id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id     UUID         NOT NULL REFERENCES tenants(id) ON DELETE CASCADE UNIQUE,
+    -- Book property fields (all default true = indexed)
+    idx_title        BOOLEAN NOT NULL DEFAULT true,
+    idx_author       BOOLEAN NOT NULL DEFAULT true,
+    idx_isbn         BOOLEAN NOT NULL DEFAULT true,
+    idx_publisher    BOOLEAN NOT NULL DEFAULT true,
+    idx_genre        BOOLEAN NOT NULL DEFAULT true,
+    idx_description  BOOLEAN NOT NULL DEFAULT true,
+    idx_publish_year BOOLEAN NOT NULL DEFAULT true,
+    idx_language     BOOLEAN NOT NULL DEFAULT true,
+    idx_keywords     BOOLEAN NOT NULL DEFAULT true,   -- keyword tags array
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Index for fast tenant lookup
+CREATE INDEX IF NOT EXISTS tenant_search_config_tenant_idx ON tenant_search_config (tenant_id);
+
+-- -----------------------------------------------------------------------------
 -- Seed superuser
 -- zed@zed.com / zed  (bcrypt cost 12)
--- This is the default system-admin account seeded on first DB initialisation.
+-- This is the default system-admin account seeded on first DB initialization.
 -- Change or remove this record in production.
 -- -----------------------------------------------------------------------------
 INSERT INTO users (tenant_id, name, email, pwd_hash, role)

@@ -1,60 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import api from '../utils/api';
-import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
 import Spinner from '../components/Spinner';
 import BookActionIcons from '../components/shared/BookActionIcons';
 import StockBadge from '../components/shared/StockBadge';
 import { PiBookOpenTextLight } from 'react-icons/pi';
 import { BiUserCircle } from 'react-icons/bi';
-import { useSession } from '../hooks/useSession';
 import { formatPrice } from '../utils/formatters';
 import type { Book } from '../types/book';
+import DashboardLayout from '../components/DashboardLayout';
+
+const SHOW_ALL_KEYWORDS = ['*', 'all', '.*'];
 
 const SearchPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [books, setBooks] = useState<Book[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
-  const session = useSession();
-  const navigate = useNavigate();
-  const isAdmin = session?.role === 'tenant-admin';
 
-  // Fresh tenant branding — always reflects admin's latest edits
-  const [tenantName, setTenantName] = useState(session?.tenant?.store_name || 'Planet of Books');
-  const [tenantLogo, setTenantLogo] = useState<string | null>(session?.tenant?.logo_url || null);
+  const isShowAll = (q: string) => {
+    const t = q.trim().toLowerCase();
+    return t === '' || SHOW_ALL_KEYWORDS.includes(t);
+  };
 
-  // Refresh tenant branding from the public endpoint on mount
-  useEffect(() => {
-    const slug = session?.tenant?.slug;
-    if (!slug) return;
-    axios
-      .get<{ data: { store_name: string; logo_url: string | null } }>(`/tenant/${slug}/info`)
-      .then((res) => {
-        const fresh = res.data.data;
-        setTenantName(fresh.store_name || 'Planet of Books');
-        setTenantLogo(fresh.logo_url || null);
-        // Update localStorage so next page load is up-to-date
-        const stored = JSON.parse(localStorage.getItem('session') || 'null');
-        if (stored?.tenant) {
-          stored.tenant.store_name = fresh.store_name;
-          stored.tenant.logo_url = fresh.logo_url;
-          localStorage.setItem('session', JSON.stringify(stored));
-        }
-      })
-      .catch(() => {/* silently ignore */});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const storeName = tenantName;
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const doSearch = async (q: string) => {
     setLoading(true);
     setSearched(false);
     try {
-      const res = await api.get<{ data: Book[] }>('/books', { params: { q: query.trim() } });
+      const params = isShowAll(q) ? {} : { q: q.trim() };
+      const res = await api.get<{ data: Book[] }>('/books', { params });
       setBooks(res.data.data || []);
     } catch {
       setBooks([]);
@@ -64,81 +37,19 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const handleSignOut = () => {
-    localStorage.removeItem('session');
-    navigate('/login');
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await doSearch(query);
   };
 
   return (
-    <div className='min-h-screen' style={{ backgroundColor: 'var(--oai-bg)' }}>
-      {/* Top nav */}
-      <header
-        style={{
-          backgroundColor: 'var(--oai-surface)',
-          borderBottom: '1px solid var(--oai-border)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <div className='max-w-7xl mx-auto px-6 h-14 flex items-center justify-between'>
-          <div className='flex items-center gap-3'>
-            <button
-              onClick={() => navigate('/home')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              {tenantLogo ? (
-                <img
-                  src={tenantLogo}
-                  alt='logo'
-                  style={{ height: '24px', objectFit: 'contain' }}
-                />
-              ) : (
-                <img src='/logo.svg' alt='BookStore' style={{ height: '24px', width: 'auto' }} />
-              )}
-              <span className='store-brand-name tracking-tight' style={{ color: 'var(--oai-text)', fontSize: '1.15rem' }}>
-                {storeName}
-              </span>
-            </button>
-          </div>
-          <div className='flex items-center gap-3'>
-            <Link
-              to='/home'
-              className='text-xs font-medium transition-colors'
-              style={{ color: 'var(--oai-muted)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--oai-text)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
-            >
-              ← Inventory
-            </Link>
-            <button
-              onClick={handleSignOut}
-              className='text-xs font-medium transition-colors'
-              style={{ color: 'var(--oai-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--oai-red, #ef4444)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <DashboardLayout>
       <div className='flex flex-col items-center pt-16 pb-12 px-4'>
-        {tenantLogo ? (
-          <img
-            src={tenantLogo}
-            alt={`${storeName} logo`}
-            className='mb-4 rounded-lg'
-            style={{ maxHeight: '72px', maxWidth: '180px', objectFit: 'contain' }}
-          />
-        ) : (
-          <div className='flex justify-center mb-4'>
-            <img src='/logo.svg' alt='BookStore' style={{ height: '80px', width: 'auto' }} />
-          </div>
-        )}
-        <h1 className='store-brand-name mb-2 tracking-tight' style={{ color: 'var(--oai-text)', fontSize: '3rem', lineHeight: 1.1 }}>
-          {storeName}
+        <h1
+          className='store-brand-name mb-2 tracking-tight'
+          style={{ color: 'var(--oai-text)', fontSize: '2.5rem', lineHeight: 1.1 }}
+        >
+          Search
         </h1>
         <p className='text-base mb-10' style={{ color: 'var(--oai-muted)' }}>
           Search across your inventory
@@ -149,7 +60,7 @@ const SearchPage: React.FC = () => {
             type='text'
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder='Search by title, author or genre…'
+            placeholder='Search by title, author, genre… or * to show all'
             className='oai-input flex-1 text-base'
             style={{ borderRadius: '9999px', padding: '0.75rem 1.5rem' }}
           />
@@ -161,6 +72,9 @@ const SearchPage: React.FC = () => {
             Search
           </button>
         </form>
+        <p className='text-xs mt-3' style={{ color: 'var(--oai-subtle)' }}>
+          Tip: use <code style={{ color: 'var(--oai-green)' }}>*</code> or <code style={{ color: 'var(--oai-green)' }}>all</code> to show everything
+        </p>
       </div>
 
       <div className='max-w-5xl mx-auto px-4 pb-24'>
@@ -171,22 +85,30 @@ const SearchPage: React.FC = () => {
         )}
 
         {!loading && !searched && (
-          <p className='text-center text-sm' style={{ color: 'var(--oai-subtle)' }}>
-            Enter a title, author, or genre above to search the catalog
-          </p>
+          <div className='text-center'>
+            <p className='text-sm mb-4' style={{ color: 'var(--oai-subtle)' }}>
+              Enter a title, author, or genre above to search the catalog
+            </p>
+            <button
+              onClick={() => doSearch('*')}
+              className='btn-primary'
+              style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem', borderRadius: '9999px' }}
+            >
+              Show All Books
+            </button>
+          </div>
         )}
 
         {!loading && searched && books.length === 0 && (
           <p className='text-center' style={{ color: 'var(--oai-muted)' }}>
-            No books found for &ldquo;<strong style={{ color: 'var(--oai-text)' }}>{query}</strong>&rdquo;
+            No books found{query && !isShowAll(query) ? <> for &ldquo;<strong style={{ color: 'var(--oai-text)' }}>{query}</strong>&rdquo;</> : null}
           </p>
         )}
 
         {!loading && books.length > 0 && (
           <>
             <p className='text-sm mb-5' style={{ color: 'var(--oai-muted)' }}>
-              {books.length} result{books.length !== 1 ? 's' : ''} for &ldquo;
-              <span style={{ color: 'var(--oai-text)' }}>{query}</span>&rdquo;
+              {books.length} result{books.length !== 1 ? 's' : ''}{query && !isShowAll(query) ? <> for &ldquo;<span style={{ color: 'var(--oai-text)' }}>{query}</span>&rdquo;</> : ' (all books)'}
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
               {books.map((book) => (
@@ -233,7 +155,7 @@ const SearchPage: React.FC = () => {
           </>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

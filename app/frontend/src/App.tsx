@@ -21,8 +21,15 @@ const App: React.FC = () => {
       <Route path='/login' element={<LoginPage />} />
       <Route path='/register' element={<RegisterPage />} />
 
-      {/* Legacy search page (redirects buyers to use store URLs) */}
-      <Route path='/search' element={<SearchPage />} />
+      {/* Search page (authenticated) */}
+      <Route
+        path='/search'
+        element={
+          <ProtectedRoute>
+            <SearchPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Public tenant-specific buyer catalog */}
       <Route path='/store/:slug' element={<StorePage />} />

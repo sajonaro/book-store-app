@@ -2,7 +2,8 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { TenantModel } from '../models/tenantModel';
 import { BookModel } from '../models/bookModel';
-import { searchBooks } from '../services/searchService';
+import { searchBooks, reindexTenant } from '../services/searchService';
+import { SearchConfigModel } from '../models/searchConfigModel';
 import { requireAuth } from '../middleware/auth';
 import { isValidUUID } from '../middleware/validate';
 
@@ -58,13 +59,19 @@ router.get('/:slug/books', async (req: Request, res: Response) => {
             const ids = await searchBooks(q.trim(), tenant.id);
 
             if (ids === null) {
-                // ES unavailable — fallback to DB text filter
+                // ES unavailable — fallback to DB text filter (case-insensitive)
                 const books = await BookModel.findAll(tenant.id);
                 const term = q.trim().toLowerCase();
                 const found = books.filter(
                     (b) =>
                         b.title.toLowerCase().includes(term) ||
-                        b.author.toLowerCase().includes(term),
+                        b.author.toLowerCase().includes(term) ||
+                        (b.isbn?.toLowerCase().includes(term) ?? false) ||
+                        (b.publisher?.toLowerCase().includes(term) ?? false) ||
+                        (b.genre?.toLowerCase().includes(term) ?? false) ||
+                        (b.description?.toLowerCase().includes(term) ?? false) ||
+                        (b.language?.toLowerCase().includes(term) ?? false) ||
+                        (b.keywords?.some((k) => k.toLowerCase().includes(term)) ?? false),
                 );
                 return res.status(200).json({ count: found.length, data: found });
             }
@@ -181,8 +188,8 @@ router.put('/apikey', requireAuth, async (req: Request, res: Response) => {
         const tenantId = req.tenantId!;
         const { openai_api_key } = req.body as { openai_api_key?: unknown };
 
-        if (!openai_api_key || typeof openai_api_key !== 'string' || !openai_api_key.trim().startsWith('sk-')) {
-            return res.status(400).json({ msg: 'A valid OpenAI API key (starting with sk-) is required' });
+        if (!openai_api_key || typeof openai_api_key !== 'string' || !openai_api_key.trim()) {
+            return res.status(400).json({ msg: 'An OpenAI API key is required' });
         }
 
         await TenantModel.updateApiKey(tenantId, openai_api_key.trim());
@@ -239,6 +246,100 @@ router.get('/qrcode', requireAuth, async (req: Request, res: Response) => {
         });
     } catch (error: unknown) {
         console.error('qrcode error:', (error as Error).message);
+        return res.status(500).json({ msg: 'Internal server error' });
+    }
+});
+
+// ── Search Index Config routes (tenant-admin only) ────────────────────────────
+
+/**
+ * GET /tenant/search-config
+ * Returns the current search indexing config for the authenticated tenant.
+ * Defaults to all-enabled if not yet configured.
+ * Accessible only by tenant-admin role.
+ */
+router.get('/search-config', requireAuth, async (req: Request, res: Response) => {
+    try {
+        if (req.authUser?.role !== 'tenant-admin') {
+            return res.status(403).json({ msg: 'Only tenant admins can access search configuration' });
+        }
+        const tenantId = req.tenantId!;
+        const config = await SearchConfigModel.getConfig(tenantId);
+        return res.status(200).json({ data: config });
+    } catch (error: unknown) {
+        console.error('search-config GET error:', (error as Error).message);
+        return res.status(500).json({ msg: 'Internal server error' });
+    }
+});
+
+/**
+ * PUT /tenant/search-config
+ * Update the search indexing config for the authenticated tenant.
+ * Body: { idx_title, idx_author, idx_isbn, idx_publisher, idx_genre,
+ *         idx_description, idx_publish_year, idx_language, idx_keywords }
+ * All fields are booleans. Omitted fields keep their current value.
+ * Accessible only by tenant-admin role.
+ */
+router.put('/search-config', requireAuth, async (req: Request, res: Response) => {
+    try {
+        if (req.authUser?.role !== 'tenant-admin') {
+            return res.status(403).json({ msg: 'Only tenant admins can update search configuration' });
+        }
+        const tenantId = req.tenantId!;
+
+        const allowedFields = [
+            'idx_title', 'idx_author', 'idx_isbn', 'idx_publisher',
+            'idx_genre', 'idx_description', 'idx_publish_year',
+            'idx_language', 'idx_keywords',
+        ] as const;
+
+        type ConfigField = typeof allowedFields[number];
+
+        const body = req.body as Record<string, unknown>;
+        const patch: Partial<Record<ConfigField, boolean>> = {};
+
+        for (const field of allowedFields) {
+            if (field in body) {
+                if (typeof body[field] !== 'boolean') {
+                    return res.status(400).json({ msg: `Field "${field}" must be a boolean` });
+                }
+                patch[field] = body[field] as boolean;
+            }
+        }
+
+        const updated = await SearchConfigModel.upsertConfig(tenantId, patch);
+        return res.status(200).json({ msg: 'Search configuration updated', data: updated });
+    } catch (error: unknown) {
+        console.error('search-config PUT error:', (error as Error).message);
+        return res.status(500).json({ msg: 'Internal server error' });
+    }
+});
+
+/**
+ * POST /tenant/search-reindex
+ * Trigger a full reindex of all books for the authenticated tenant,
+ * using the current search config.
+ * Accessible only by tenant-admin role.
+ * Returns { indexed_count, total_books }
+ */
+router.post('/search-reindex', requireAuth, async (req: Request, res: Response) => {
+    try {
+        if (req.authUser?.role !== 'tenant-admin') {
+            return res.status(403).json({ msg: 'Only tenant admins can trigger a reindex' });
+        }
+        const tenantId = req.tenantId!;
+
+        // Load all books for the tenant
+        const books = await BookModel.findAll(tenantId);
+        const indexedCount = await reindexTenant(tenantId, books);
+
+        return res.status(200).json({
+            msg: 'Reindex complete',
+            indexed_count: indexedCount,
+            total_books: books.length,
+        });
+    } catch (error: unknown) {
+        console.error('search-reindex error:', (error as Error).message);
         return res.status(500).json({ msg: 'Internal server error' });
     }
 });

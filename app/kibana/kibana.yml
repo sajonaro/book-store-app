@@ -1,0 +1,18 @@
+# Kibana configuration for Book Store App
+# Mounted into the Kibana container at /usr/share/kibana/config/kibana.yml
+
+server.host: "0.0.0.0"
+server.name: "bookstore-kibana"
+
+# Connect to Elasticsearch on the internal Docker network
+elasticsearch.hosts: ["http://elastic:9200"]
+
+# Disable telemetry
+telemetry.enabled: false
+telemetry.optIn: false
+
+# Disable the "Welcome" screen on first load
+newsfeed.enabled: false
+
+# Logging
+logging.root.level: warn

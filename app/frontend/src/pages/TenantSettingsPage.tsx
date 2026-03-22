@@ -4,11 +4,48 @@ import { useSnackbar } from 'notistack';
 import api from '../utils/api';
 import { useSession } from '../hooks/useSession';
 import Spinner from '../components/Spinner';
+import DashboardLayout from '../components/DashboardLayout';
 
 interface QRCodeData {
   catalog_url: string;
   qr_data_uri: string | null;
 }
+
+interface SearchConfig {
+  idx_title: boolean;
+  idx_author: boolean;
+  idx_isbn: boolean;
+  idx_publisher: boolean;
+  idx_genre: boolean;
+  idx_description: boolean;
+  idx_publish_year: boolean;
+  idx_language: boolean;
+  idx_keywords: boolean;
+}
+
+const DEFAULT_SEARCH_CONFIG: SearchConfig = {
+  idx_title: true,
+  idx_author: true,
+  idx_isbn: true,
+  idx_publisher: true,
+  idx_genre: true,
+  idx_description: true,
+  idx_publish_year: true,
+  idx_language: true,
+  idx_keywords: true,
+};
+
+const SEARCH_FIELD_LABELS: Record<keyof SearchConfig, string> = {
+  idx_title: 'Title',
+  idx_author: 'Author',
+  idx_isbn: 'ISBN',
+  idx_publisher: 'Publisher',
+  idx_genre: 'Genre',
+  idx_description: 'Description',
+  idx_publish_year: 'Publication Year',
+  idx_language: 'Language',
+  idx_keywords: 'Keyword Tags',
+};
 
 interface TenantUser {
   id: string;
@@ -148,6 +185,13 @@ const TenantSettingsPage: React.FC = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoLoading, setLogoLoading] = useState(false);
 
+  // ── Search Config state (admin only) ────────────────────────────────────────
+  const [searchConfig, setSearchConfig] = useState<SearchConfig>(DEFAULT_SEARCH_CONFIG);
+  const [searchConfigLoading, setSearchConfigLoading] = useState(false);
+  const [searchConfigSaving, setSearchConfigSaving] = useState(false);
+  const [reindexLoading, setReindexLoading] = useState(false);
+  const [reindexResult, setReindexResult] = useState<{ indexed_count: number; total_books: number } | null>(null);
+
   // ── OpenAI / QR ─────────────────────────────────────────────────────────────
   const [apiKey, setApiKey] = useState('');
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
@@ -169,6 +213,19 @@ const TenantSettingsPage: React.FC = () => {
   const [newUserConfirmPwd, setNewUserConfirmPwd] = useState('');
   const [createUserLoading, setCreateUserLoading] = useState(false);
 
+  const loadSearchConfig = useCallback(async () => {
+    if (!isAdmin) return;
+    setSearchConfigLoading(true);
+    try {
+      const res = await api.get<{ data: SearchConfig }>('/tenant/search-config');
+      setSearchConfig(res.data.data || DEFAULT_SEARCH_CONFIG);
+    } catch {
+      // silently fall back to defaults
+    } finally {
+      setSearchConfigLoading(false);
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     if (!session) navigate('/login');
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,7 +245,10 @@ const TenantSettingsPage: React.FC = () => {
   }, [isAdmin]);
 
   useEffect(() => {
-    if (isAdmin) loadUsers();
+    if (isAdmin) {
+      loadUsers();
+      loadSearchConfig();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -242,7 +302,7 @@ const TenantSettingsPage: React.FC = () => {
   };
 
   const handleSaveApiKey = async () => {
-    if (!apiKey.trim().startsWith('sk-')) { enqueueSnackbar('A valid OpenAI API key (starting with sk-) is required', { variant: 'warning' }); return; }
+    if (!apiKey.trim()) { enqueueSnackbar('An OpenAI API key is required', { variant: 'warning' }); return; }
     setApiKeyLoading(true);
     try {
       await api.put('/tenant/apikey', { openai_api_key: apiKey.trim() });
@@ -323,47 +383,39 @@ const TenantSettingsPage: React.FC = () => {
     }
   };
 
+  const handleSaveSearchConfig = async () => {
+    setSearchConfigSaving(true);
+    try {
+      const res = await api.put<{ data: SearchConfig }>('/tenant/search-config', searchConfig);
+      setSearchConfig(res.data.data || searchConfig);
+      enqueueSnackbar('Search configuration saved!', { variant: 'success' });
+    } catch (err: unknown) {
+      enqueueSnackbar((err as { response?: { data?: { msg?: string } } }).response?.data?.msg || 'Failed to save search configuration', { variant: 'error' });
+    } finally {
+      setSearchConfigSaving(false);
+    }
+  };
+
+  const handleReindex = async () => {
+    setReindexLoading(true);
+    setReindexResult(null);
+    try {
+      const res = await api.post<{ indexed_count: number; total_books: number; msg: string }>('/tenant/search-reindex');
+      setReindexResult({ indexed_count: res.data.indexed_count, total_books: res.data.total_books });
+      enqueueSnackbar(`Reindex complete: ${res.data.indexed_count} of ${res.data.total_books} books indexed`, { variant: 'success' });
+    } catch (err: unknown) {
+      enqueueSnackbar((err as { response?: { data?: { msg?: string } } }).response?.data?.msg || 'Reindex failed', { variant: 'error' });
+    } finally {
+      setReindexLoading(false);
+    }
+  };
+
   const handleSignOut = () => { localStorage.removeItem('session'); navigate('/login'); };
 
   if (!session) return null;
 
   return (
-    <div className='min-h-screen' style={{ backgroundColor: 'var(--oai-bg)' }}>
-      {/* Top nav */}
-      <header
-        style={{
-          backgroundColor: 'var(--oai-surface)',
-          borderBottom: '1px solid var(--oai-border)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <div className='max-w-7xl mx-auto px-6 h-14 flex items-center justify-between'>
-          <button
-            onClick={() => navigate('/home')}
-            className='text-base font-semibold tracking-tight'
-            style={{ color: 'var(--oai-text)', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            ← <img src='/logo.svg' alt='logo' style={{ height: '20px', width: 'auto', display: 'inline', verticalAlign: 'middle', marginLeft: '4px', marginRight: '4px' }} /> <span className='store-brand-name'>{session.tenant?.store_name || 'Planet of Books'}</span>
-          </button>
-          <div className='flex items-center gap-4'>
-            <span className='text-sm font-medium' style={{ color: 'var(--oai-muted)' }}>
-              Settings
-            </span>
-            <button
-              onClick={handleSignOut}
-              className='text-xs font-medium transition-colors'
-              style={{ color: 'var(--oai-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--oai-muted)')}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <DashboardLayout>
       <main className='max-w-2xl mx-auto px-6 py-10 space-y-3'>
 
         {/* ── Store Information ─────────────────────────────────────────────── */}
@@ -582,77 +634,153 @@ const TenantSettingsPage: React.FC = () => {
           </div>
         </Section>
 
-        {/* ── OpenAI API Key (admin only) ───────────────────────────────────── */}
+        {/* ── Search Index Settings (admin only) ──────────────────────────── */}
         {isAdmin && (
-          <Section title='OpenAI API Key' defaultOpen={false}>
+          <Section title='Search Index Settings' defaultOpen={false}>
             <p className='text-sm mb-4' style={{ color: 'var(--oai-muted)' }}>
-              Required for AI-powered book recognition. Stored encrypted. Leave blank to keep the existing key.
-            </p>
-            <div className='flex items-center gap-3'>
-              <input
-                type='password'
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder='sk-...'
-                className='oai-input flex-1'
-              />
-              <button
-                onClick={handleSaveApiKey}
-                disabled={apiKeyLoading}
-                className='btn-primary'
-                style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', whiteSpace: 'nowrap' }}
-              >
-                {apiKeyLoading ? 'Saving…' : 'Save Key'}
-              </button>
-            </div>
-          </Section>
-        )}
-
-        {/* ── Buyer QR Code (admin only) ─────────────────────────────────────── */}
-        {isAdmin && (
-          <Section title='Buyer QR Code' defaultOpen={false}>
-            <p className='text-sm mb-4' style={{ color: 'var(--oai-muted)' }}>
-              Generate a QR code buyers can scan to open your catalog directly.
+              Choose which book fields are indexed in Elasticsearch for full-text search.
+              All fields are enabled by default. Disable fields to reduce noise or improve relevance.
+              After changing the configuration, click <strong>Save Config</strong> and then
+              <strong> Rebuild Search Index</strong> to apply changes to existing books.
             </p>
 
-            {!qrData && (
-              <button onClick={handleGenerateQR} disabled={qrLoading} className='btn-primary' style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>
-                {qrLoading ? <Spinner /> : 'Generate QR Code'}
-              </button>
-            )}
-
-            {qrData && (
-              <div>
-                <p className='text-sm mb-3' style={{ color: 'var(--oai-muted)' }}>
-                  Catalog URL:{' '}
-                  <a href={qrData.catalog_url} target='_blank' rel='noopener noreferrer' style={{ color: 'var(--oai-green)' }}>
-                    {qrData.catalog_url}
-                  </a>
-                </p>
-
-                {qrData.qr_data_uri ? (
-                  <div className='flex flex-col items-start gap-3'>
-                    <img src={qrData.qr_data_uri} alt='QR Code' className='rounded-lg border' style={{ borderColor: 'var(--oai-border)', width: 200, height: 200 }} />
-                    <div className='flex gap-2'>
-                      <button onClick={handleDownloadQR} className='btn-primary' style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>
-                        Download PNG
-                      </button>
-                      <button onClick={() => setQrData(null)} className='text-sm' style={{ color: 'var(--oai-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                        Regenerate
-                      </button>
+            {searchConfigLoading ? (
+              <Spinner />
+            ) : (
+              <div className='space-y-3 mb-5'>
+                {(Object.keys(SEARCH_FIELD_LABELS) as Array<keyof SearchConfig>).map((field) => (
+                  <label
+                    key={field}
+                    className='flex items-center justify-between cursor-pointer rounded-lg px-4 py-3'
+                    style={{ backgroundColor: 'var(--oai-bg)', border: '1px solid var(--oai-border)' }}
+                  >
+                    <span className='text-sm font-medium' style={{ color: 'var(--oai-text)' }}>
+                      {SEARCH_FIELD_LABELS[field]}
+                    </span>
+                    <div className='relative inline-flex items-center'>
+                      <input
+                        type='checkbox'
+                        checked={searchConfig[field]}
+                        onChange={(e) => setSearchConfig((prev) => ({ ...prev, [field]: e.target.checked }))}
+                        className='sr-only peer'
+                      />
+                      <div
+                        onClick={() => setSearchConfig((prev) => ({ ...prev, [field]: !prev[field] }))}
+                        className='w-11 h-6 rounded-full cursor-pointer transition-colors duration-200'
+                        style={{
+                          backgroundColor: searchConfig[field] ? 'var(--oai-green)' : 'var(--oai-border)',
+                          position: 'relative',
+                        }}
+                      >
+                        <div
+                          className='absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-200'
+                          style={{
+                            backgroundColor: 'white',
+                            transform: searchConfig[field] ? 'translateX(20px)' : 'translateX(0)',
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <p className='text-sm' style={{ color: 'var(--oai-subtle)' }}>
-                    {(qrData as unknown as { msg?: string }).msg || 'QR code image unavailable.'}
-                  </p>
-                )}
+                  </label>
+                ))}
               </div>
             )}
+
+            <div className='flex flex-wrap items-center gap-3 mt-2'>
+              <button
+                onClick={handleSaveSearchConfig}
+                disabled={searchConfigSaving || searchConfigLoading}
+                className='btn-primary'
+                style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+              >
+                {searchConfigSaving ? 'Saving…' : 'Save Config'}
+              </button>
+
+              <button
+                onClick={handleReindex}
+                disabled={reindexLoading}
+                className='btn-primary'
+                style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid #818cf8' }}
+              >
+                {reindexLoading ? 'Rebuilding…' : 'Rebuild Search Index'}
+              </button>
+            </div>
+
+            {reindexResult && (
+              <p className='text-sm mt-3' style={{ color: 'var(--oai-green)' }}>
+                ✓ Indexed {reindexResult.indexed_count} of {reindexResult.total_books} books successfully.
+              </p>
+            )}
           </Section>
         )}
+
+        {/* ── OpenAI API Key (all users) ───────────────────────────────────── */}
+        <Section title='OpenAI API Key' defaultOpen={false}>
+          <p className='text-sm mb-4' style={{ color: 'var(--oai-muted)' }}>
+            Required for AI-powered book recognition. Stored encrypted. Leave blank to keep the existing key.
+          </p>
+          <div className='flex items-center gap-3'>
+            <input
+              type='password'
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder='sk-...'
+              className='oai-input flex-1'
+            />
+            <button
+              onClick={handleSaveApiKey}
+              disabled={apiKeyLoading}
+              className='btn-primary'
+              style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', whiteSpace: 'nowrap' }}
+            >
+              {apiKeyLoading ? 'Saving…' : 'Save Key'}
+            </button>
+          </div>
+        </Section>
+
+        {/* ── Buyer QR Code (all users) ─────────────────────────────────────── */}
+        <Section title='Buyer QR Code' defaultOpen={false}>
+          <p className='text-sm mb-4' style={{ color: 'var(--oai-muted)' }}>
+            Generate a QR code buyers can scan to open your catalog directly.
+          </p>
+
+          {!qrData && (
+            <button onClick={handleGenerateQR} disabled={qrLoading} className='btn-primary' style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>
+              {qrLoading ? <Spinner /> : 'Generate QR Code'}
+            </button>
+          )}
+
+          {qrData && (
+            <div>
+              <p className='text-sm mb-3' style={{ color: 'var(--oai-muted)' }}>
+                Catalog URL:{' '}
+                <a href={qrData.catalog_url} target='_blank' rel='noopener noreferrer' style={{ color: 'var(--oai-green)' }}>
+                  {qrData.catalog_url}
+                </a>
+              </p>
+
+              {qrData.qr_data_uri ? (
+                <div className='flex flex-col items-start gap-3'>
+                  <img src={qrData.qr_data_uri} alt='QR Code' className='rounded-lg border' style={{ borderColor: 'var(--oai-border)', width: 200, height: 200 }} />
+                  <div className='flex gap-2'>
+                    <button onClick={handleDownloadQR} className='btn-primary' style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>
+                      Download PNG
+                    </button>
+                    <button onClick={() => setQrData(null)} className='text-sm' style={{ color: 'var(--oai-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      Regenerate
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className='text-sm' style={{ color: 'var(--oai-subtle)' }}>
+                  {(qrData as unknown as { msg?: string }).msg || 'QR code image unavailable.'}
+                </p>
+              )}
+            </div>
+          )}
+        </Section>
       </main>
-    </div>
+    </DashboardLayout>
   );
 };
 

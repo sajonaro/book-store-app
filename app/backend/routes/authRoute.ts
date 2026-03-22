@@ -65,11 +65,7 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
       return res.status(409).json({ msg: 'An account with this email already exists. Please use a different email address.' });
     }
 
-    // OpenAI API key is required at registration — it is needed for AI book recognition.
-    if (!openai_api_key || typeof openai_api_key !== 'string' || !openai_api_key.trim().startsWith('sk-')) {
-      return res.status(400).json({ msg: 'A valid OpenAI API key (starting with sk-) is required to register a store.' });
-    }
-    const apiKey = openai_api_key.trim();
+    const apiKey = openai_api_key && typeof openai_api_key === 'string' ? openai_api_key.trim() : '';
     const tenant = await TenantModel.create(store_name.trim(), apiKey);
 
     // Create tenant-admin user for this tenant
@@ -88,7 +84,7 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
       token,
       user: { id: user.id, name: user.name, email: user.email },
       role: 'tenant-admin',
-      tenant: { id: tenant.id, store_name: tenant.store_name, slug: tenant.slug, has_openai_key: true },
+      tenant: { id: tenant.id, store_name: tenant.store_name, slug: tenant.slug, has_openai_key: !!apiKey },
     });
   } catch (error: unknown) {
     console.error('register error:', (error as Error).message);

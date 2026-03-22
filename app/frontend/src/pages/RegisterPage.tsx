@@ -8,8 +8,6 @@ const RegisterPage: React.FC = () => {
   const [adminName, setAdminName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [openaiApiKey, setOpenaiApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
@@ -32,11 +30,6 @@ const RegisterPage: React.FC = () => {
       enqueueSnackbar('Password must be at least 8 characters', { variant: 'warning' });
       return;
     }
-    if (!openaiApiKey.trim().startsWith('sk-')) {
-      enqueueSnackbar('A valid OpenAI API key (starting with sk-) is required', { variant: 'warning' });
-      return;
-    }
-
     setLoading(true);
     try {
       const res = await axios.post<{
@@ -48,7 +41,6 @@ const RegisterPage: React.FC = () => {
         admin_name: adminName.trim(),
         email: email.trim(),
         password,
-        openai_api_key: openaiApiKey.trim(),
       });
 
       localStorage.setItem(
@@ -156,53 +148,6 @@ const RegisterPage: React.FC = () => {
               required
             />
           </div>
-          <div>
-            <label className='oai-label'>
-              OpenAI API Key <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showKey ? 'text' : 'password'}
-                value={openaiApiKey}
-                onChange={(e) => setOpenaiApiKey(e.target.value)}
-                placeholder='sk-...'
-                className='oai-input'
-                style={{ paddingRight: '2.75rem' }}
-                required
-              />
-              <button
-                type='button'
-                onClick={() => setShowKey((v) => !v)}
-                style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--oai-muted)',
-                  fontSize: '0.75rem',
-                  padding: 0,
-                }}
-                tabIndex={-1}
-              >
-                {showKey ? 'Hide' : 'Show'}
-              </button>
-            </div>
-            <p className='text-xs mt-1' style={{ color: 'var(--oai-subtle)' }}>
-              Required for AI book recognition. Get yours at{' '}
-              <a
-                href='https://platform.openai.com/api-keys'
-                target='_blank'
-                rel='noopener noreferrer'
-                style={{ color: 'var(--oai-green)' }}
-              >
-                platform.openai.com
-              </a>
-            </p>
-          </div>
-
           <button
             type='submit'
             disabled={loading}
