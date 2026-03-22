@@ -179,7 +179,39 @@ const StoreBookDetailPage: React.FC = () => {
               <InfoRow label='Publisher' value={book.publisher} />
               <InfoRow label='Publish Year' value={book.publish_year} />
               <InfoRow label='Language' value={book.language} />
+              <InfoRow label='Genre' value={book.genre} />
+              <InfoRow label='Shelf Name' value={book.shelf_name} />
+              <InfoRow label='Shelf Number' value={book.shelf_number} />
+              <InfoRow label='Price' value={book.price != null ? `$${parseFloat(String(book.price)).toFixed(2)}` : null} />
+              <InfoRow label='Stock' value={book.stock != null ? `${book.stock} in stock` : null} />
             </div>
+
+            {/* Keyword tags */}
+            {book.keywords && book.keywords.length > 0 && (
+              <div className='mt-4'>
+                <p
+                  className='text-xs font-medium uppercase tracking-wider mb-2'
+                  style={{ color: 'var(--oai-muted)' }}
+                >
+                  Tags
+                </p>
+                <div className='flex flex-wrap gap-2'>
+                  {book.keywords.map((tag) => (
+                    <span
+                      key={tag}
+                      className='text-xs px-2 py-1 rounded-full'
+                      style={{
+                        backgroundColor: 'rgba(99,102,241,0.12)',
+                        color: '#818cf8',
+                        border: '1px solid rgba(99,102,241,0.3)',
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
