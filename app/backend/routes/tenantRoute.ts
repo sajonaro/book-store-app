@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { TenantModel } from '../models/tenantModel';
-import { BookModel } from '../models/bookModel';
+import { BookModel, BookRow } from '../models/bookModel';
 import { searchBooks, reindexTenant } from '../services/searchService';
 import { SearchConfigModel } from '../models/searchConfigModel';
 import { requireAuth } from '../middleware/auth';
@@ -246,6 +246,105 @@ router.get('/qrcode', requireAuth, async (req: Request, res: Response) => {
         });
     } catch (error: unknown) {
         console.error('qrcode error:', (error as Error).message);
+        return res.status(500).json({ msg: 'Internal server error' });
+    }
+});
+
+// ── Catalog Export route (tenant-admin only) ─────────────────────────────────
+
+/** Shape of a single exportable book record (no binary thumbnail). */
+interface ExportRow {
+    id: string;
+    title: string;
+    author: string;
+    isbn: string;
+    publisher: string;
+    publish_year: number | string;
+    genre: string;
+    description: string;
+    price: number;
+    stock: number;
+    language: string;
+    shelf_name: string;
+    shelf_number: string;
+    keywords: string;
+    created_at: string;
+    updated_at: string;
+}
+
+const CSV_EXPORT_HEADERS: (keyof ExportRow)[] = [
+    'id', 'title', 'author', 'isbn', 'publisher', 'publish_year',
+    'genre', 'description', 'price', 'stock', 'language',
+    'shelf_name', 'shelf_number', 'keywords', 'created_at', 'updated_at',
+];
+
+function toExportRow(b: BookRow): ExportRow {
+    return {
+        id:           b.id,
+        title:        b.title,
+        author:       b.author,
+        isbn:         b.isbn         ?? '',
+        publisher:    b.publisher    ?? '',
+        publish_year: b.publish_year ?? '',
+        genre:        b.genre        ?? '',
+        description:  b.description  ?? '',
+        price:        b.price,
+        stock:        b.stock,
+        language:     b.language     ?? '',
+        shelf_name:   b.shelf_name   ?? '',
+        shelf_number: b.shelf_number ?? '',
+        keywords:     (b.keywords ?? []).join(';'),
+        created_at:   b.created_at ? new Date(b.created_at).toISOString() : '',
+        updated_at:   b.updated_at ? new Date(b.updated_at).toISOString() : '',
+    };
+}
+
+function escapeCSV(val: unknown): string {
+    const str = val == null ? '' : String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+}
+
+/**
+ * GET /tenant/export?format=csv|json
+ * Export the entire book catalog for the authenticated tenant.
+ * Supports format=csv (default) or format=json.
+ * Only accessible by tenant-admin role.
+ */
+router.get('/export', requireAuth, async (req: Request, res: Response) => {
+    try {
+        if (req.authUser?.role !== 'tenant-admin') {
+            return res.status(403).json({ msg: 'Only tenant admins can export the catalog' });
+        }
+
+        const format = ((req.query.format as string) || 'csv').toLowerCase();
+        if (format !== 'csv' && format !== 'json') {
+            return res.status(400).json({ msg: 'Invalid format. Use "csv" or "json".' });
+        }
+
+        const tenantId = req.tenantId!;
+        const books = await BookModel.findAll(tenantId);
+        const rows = books.map(toExportRow);
+        const timestamp = Date.now();
+
+        if (format === 'json') {
+            res.setHeader('Content-Disposition', `attachment; filename="catalog-export-${timestamp}.json"`);
+            res.setHeader('Content-Type', 'application/json');
+            return res.status(200).send(JSON.stringify(rows, null, 2));
+        }
+
+        // CSV
+        const csvRows = rows.map((r) =>
+            CSV_EXPORT_HEADERS.map((h) => escapeCSV(r[h])).join(','),
+        );
+        const csv = [CSV_EXPORT_HEADERS.join(','), ...csvRows].join('\n');
+        res.setHeader('Content-Disposition', `attachment; filename="catalog-export-${timestamp}.csv"`);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        return res.status(200).send(csv);
+    } catch (error: unknown) {
+        console.error('catalog export error:', (error as Error).message);
         return res.status(500).json({ msg: 'Internal server error' });
     }
 });

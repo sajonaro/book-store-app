@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import api from '../utils/api';
-import { useSession } from '../hooks/useSession';
+import { useSession, getAuthHeader } from '../hooks/useSession';
 import Spinner from '../components/Spinner';
 import DashboardLayout from '../components/DashboardLayout';
 
@@ -121,18 +121,6 @@ const Section = ({
   );
 };
 
-/** Horizontal divider with label */
-const SubHeading = ({ label }: { label: string }) => (
-  <div
-    className='flex items-center gap-3 my-5'
-    style={{ borderTop: '1px solid var(--oai-border)', paddingTop: '1.25rem' }}
-  >
-    <span className='text-xs font-semibold uppercase tracking-widest' style={{ color: 'var(--oai-muted)' }}>
-      {label}
-    </span>
-  </div>
-);
-
 /** Password input with show/hide toggle */
 const PwdInput = ({
   value,
@@ -191,6 +179,10 @@ const TenantSettingsPage: React.FC = () => {
   const [searchConfigSaving, setSearchConfigSaving] = useState(false);
   const [reindexLoading, setReindexLoading] = useState(false);
   const [reindexResult, setReindexResult] = useState<{ indexed_count: number; total_books: number } | null>(null);
+
+  // ── Export state (admin only) ────────────────────────────────────────────────
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+  const [exportLoading, setExportLoading] = useState(false);
 
   // ── OpenAI / QR ─────────────────────────────────────────────────────────────
   const [apiKey, setApiKey] = useState('');
@@ -410,7 +402,36 @@ const TenantSettingsPage: React.FC = () => {
     }
   };
 
-  const handleSignOut = () => { localStorage.removeItem('session'); navigate('/login'); };
+  const handleExport = async () => {
+    setExportLoading(true);
+    try {
+      const response = await fetch(`/tenant/export?format=${exportFormat}`, {
+        headers: { ...getAuthHeader() },
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ msg: 'Export failed' }));
+        enqueueSnackbar((err as { msg?: string }).msg || 'Export failed', { variant: 'error' });
+        return;
+      }
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition') || '';
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      const filename = filenameMatch ? filenameMatch[1] : `catalog-export.${exportFormat}`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      enqueueSnackbar(`Catalog exported as ${exportFormat.toUpperCase()} successfully!`, { variant: 'success' });
+    } catch (err: unknown) {
+      enqueueSnackbar((err as { message?: string }).message || 'Export failed', { variant: 'error' });
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   if (!session) return null;
 
@@ -711,6 +732,54 @@ const TenantSettingsPage: React.FC = () => {
                 ✓ Indexed {reindexResult.indexed_count} of {reindexResult.total_books} books successfully.
               </p>
             )}
+          </Section>
+        )}
+
+        {/* ── Catalog Export (admin only) ──────────────────────────────────── */}
+        {isAdmin && (
+          <Section title='Catalog Export' defaultOpen={false}>
+            <p className='text-sm mb-4' style={{ color: 'var(--oai-muted)' }}>
+              Export your entire book catalog including all fields (title, author, ISBN, publisher,
+              year, genre, description, price, stock, language, shelf, keywords). Choose a format
+              and click Export.
+            </p>
+
+            <div className='flex items-center gap-3 mb-4'>
+              <label className='text-sm font-medium' style={{ color: 'var(--oai-text)' }}>
+                Format:
+              </label>
+              <label className='flex items-center gap-2 cursor-pointer'>
+                <input
+                  type='radio'
+                  name='exportFormat'
+                  value='csv'
+                  checked={exportFormat === 'csv'}
+                  onChange={() => setExportFormat('csv')}
+                  style={{ accentColor: 'var(--oai-green)' }}
+                />
+                <span className='text-sm' style={{ color: 'var(--oai-text)' }}>CSV</span>
+              </label>
+              <label className='flex items-center gap-2 cursor-pointer'>
+                <input
+                  type='radio'
+                  name='exportFormat'
+                  value='json'
+                  checked={exportFormat === 'json'}
+                  onChange={() => setExportFormat('json')}
+                  style={{ accentColor: 'var(--oai-green)' }}
+                />
+                <span className='text-sm' style={{ color: 'var(--oai-text)' }}>JSON</span>
+              </label>
+            </div>
+
+            <button
+              onClick={handleExport}
+              disabled={exportLoading}
+              className='btn-primary'
+              style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+            >
+              {exportLoading ? 'Exporting…' : `Export as ${exportFormat.toUpperCase()}`}
+            </button>
           </Section>
         )}
 
